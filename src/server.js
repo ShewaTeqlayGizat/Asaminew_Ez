@@ -5,7 +5,7 @@ const rateLimit = require('express-rate-limit');
 
 const { simpleCrudRouter } = require('./utils/simpleCrud');
 
-const app = express();
+const app = express();app.set('trust proxy', 1);
 app.use(express.json({ limit: '2mb' }));
 
 // Only allow requests from your GitHub Pages site (and localhost for dev).
