@@ -20,6 +20,7 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/setup-admin', require('./routes/setup'));
 app.use('/api/members', require('./routes/members'));
 app.use('/api/member-registry', require('./routes/memberRegistry'));
 app.use('/api/training', require('./routes/training'));
