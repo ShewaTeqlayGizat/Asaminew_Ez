@@ -11,6 +11,7 @@ const VALID_TYPES = [
   'library', 'eduText', 'eduPdf', 'eduPpt',
   'entVideo', 'entAudio', 'entLit', 'entCulture',
   'topicBoardArticle', 'topicBoardInfo',
+  'channelVideo',
 ];
 
 // GET /api/content?type=eduPdf&topic=agriculture - public
@@ -42,23 +43,28 @@ router.get('/', async (req, res) => {
 
 // POST /api/content - admin only. Accepts optional file upload (field name "file").
 router.post('/', requireAdmin, upload.single('file'), async (req, res) => {
-  const { type, topic_key, title, author, category, body, pages, date } = req.body;
-  if (!type || !VALID_TYPES.includes(type)) {
-    return res.status(400).json({ error: 'valid type required' });
-  }
-  if (!title) return res.status(400).json({ error: 'title required' });
+  try {
+    const { type, topic_key, title, author, category, body, pages, date } = req.body;
+    if (!type || !VALID_TYPES.includes(type)) {
+      return res.status(400).json({ error: 'valid type required' });
+    }
+    if (!title) return res.status(400).json({ error: 'title required' });
 
-  let file_url = null;
-  if (req.file) {
-    file_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, type);
-  }
+    let file_url = null;
+    if (req.file) {
+      file_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, type);
+    }
 
-  const { rows } = await pool.query(
-    `INSERT INTO content_items (type, topic_key, title, author, category, body, file_url, pages, date)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8, COALESCE($9, CURRENT_DATE)) RETURNING *`,
-    [type, topic_key || null, title, author || null, category || null, body || null, file_url, pages || null, date || null]
-  );
-  res.status(201).json(rows[0]);
+    const { rows } = await pool.query(
+      `INSERT INTO content_items (type, topic_key, title, author, category, body, file_url, pages, date)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8, COALESCE($9, CURRENT_DATE)) RETURNING *`,
+      [type, topic_key || null, title, author || null, category || null, body || null, file_url, pages || null, date || null]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error('Content upload failed:', err);
+    res.status(500).json({ error: 'Upload failed: ' + err.message });
+  }
 });
 
 router.delete('/:id', requireAdmin, async (req, res) => {
