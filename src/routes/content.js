@@ -11,7 +11,7 @@ const VALID_TYPES = [
   'library', 'eduText', 'eduPdf', 'eduPpt',
   'entVideo', 'entAudio', 'entLit', 'entCulture',
   'topicBoardArticle', 'topicBoardInfo',
-  'channelVideo',
+  'channelVideo', 'liveBroadcast', 'gazettePdf', 'gazetteText', 'radioNews',
 ];
 
 // GET /api/content?type=eduPdf&topic=agriculture - public
