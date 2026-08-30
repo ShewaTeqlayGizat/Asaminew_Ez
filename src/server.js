@@ -5,7 +5,19 @@ const rateLimit = require('express-rate-limit');
 
 const { simpleCrudRouter } = require('./utils/simpleCrud');
 
-const app = express();app.set('trust proxy', 1);
+// Safety net: prevent the whole server from crashing on an unexpected error
+// in any route (e.g. a bad Supabase Storage config, a DB hiccup). Without
+// this, Node exits the process on an unhandled rejection and the service
+// stays down until Render notices and restarts it — which is what earlier
+// looked like "Failed to fetch" after any single broken request.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection (server stays up):', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception (server stays up):', err);
+});
+
+const app = express();
 app.use(express.json({ limit: '2mb' }));
 
 // Only allow requests from your GitHub Pages site (and localhost for dev).
