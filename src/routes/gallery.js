@@ -5,42 +5,50 @@ const { requireAdmin } = require('../middleware/auth');
 const { uploadFile } = require('../utils/storage');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
-// GET /api/info-board - public (viewing stays open to everyone)
+// GET /api/gallery?type=photo - public
 router.get('/', async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM info_board_posts ORDER BY date DESC, id DESC');
+  const { type } = req.query;
+  const params = [];
+  let where = '';
+  if (type) {
+    params.push(type);
+    where = 'WHERE type = $1';
+  }
+  const { rows } = await pool.query(
+    `SELECT * FROM gallery_media ${where} ORDER BY created_at DESC`,
+    params
+  );
   res.json(rows);
 });
 
-// POST /api/info-board - ADMIN ONLY.
-// This is the route that used to be wide open to any visitor in the old
-// localStorage version. Locking it down is the main security fix here.
+// POST /api/gallery - admin only.
+// For photos, upload a file (field "file"). For videos, pass a "url" (e.g. YouTube embed link).
 router.post('/', requireAdmin, upload.single('file'), async (req, res) => {
-  const { title, type, content } = req.body;
-  if (!title) return res.status(400).json({ error: 'title required' });
+  try {
+    const { type, title, url } = req.body;
+    const mediaType = type === 'video' ? 'video' : 'photo';
 
-  if (type === 'pdf') {
-    if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const file_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'info-board');
+    let finalUrl = url || null;
+    if (mediaType === 'photo' && req.file) {
+      finalUrl = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'gallery');
+    }
+    if (!finalUrl) return res.status(400).json({ error: 'file or url required' });
+
     const { rows } = await pool.query(
-      `INSERT INTO info_board_posts (title, type, file_url) VALUES ($1, 'pdf', $2) RETURNING *`,
-      [title, file_url]
+      `INSERT INTO gallery_media (type, title, url) VALUES ($1, $2, $3) RETURNING *`,
+      [mediaType, title || null, finalUrl]
     );
-    return res.status(201).json(rows[0]);
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error('Gallery upload failed:', err);
+    res.status(500).json({ error: 'Upload failed: ' + err.message });
   }
-
-  if (!content) return res.status(400).json({ error: 'content required for text posts' });
-  const { rows } = await pool.query(
-    `INSERT INTO info_board_posts (title, type, content) VALUES ($1, 'text', $2) RETURNING *`,
-    [title, content]
-  );
-  res.status(201).json(rows[0]);
 });
 
-// DELETE /api/info-board/:id - ADMIN ONLY (was previously open to anyone)
 router.delete('/:id', requireAdmin, async (req, res) => {
-  await pool.query('DELETE FROM info_board_posts WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM gallery_media WHERE id = $1', [req.params.id]);
   res.status(204).end();
 });
 
