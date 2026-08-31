@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const pool = require('../db');
-const { requireAdmin } = require('../middleware/auth');
+const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { uploadFile } = require('../utils/storage');
 
 const router = express.Router();
@@ -16,27 +16,32 @@ router.get('/', requireAdmin, async (req, res) => {
   res.json(rows);
 });
 
-router.post('/', requireAdmin, upload.single('photo'), async (req, res) => {
-  const { name, gender, age, birthplace, reg_id, join_date, marital, role, education, skill, status, bio } = req.body;
-  if (!name) return res.status(400).json({ error: 'name required' });
+router.post('/', requireSuperAdmin, upload.single('photo'), async (req, res) => {
+  try {
+    const { name, gender, age, birthplace, reg_id, join_date, marital, role, education, skill, status, bio } = req.body;
+    if (!name) return res.status(400).json({ error: 'name required' });
 
-  let photo_url = null;
-  if (req.file) {
-    photo_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'members');
+    let photo_url = null;
+    if (req.file) {
+      photo_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'members');
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO member_registrations
+         (name, photo_url, gender, age, birthplace, reg_id, join_date, marital, role, education, skill, status, bio)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,COALESCE($12,'ንቁ'),$13) RETURNING *`,
+      [name, photo_url, gender || null, age || null, birthplace || null, reg_id || null,
+       join_date || null, marital || null, role || null, education || null, skill || null,
+       status || null, bio || null]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error('Member registration failed:', err);
+    res.status(500).json({ error: 'Upload failed: ' + err.message });
   }
-
-  const { rows } = await pool.query(
-    `INSERT INTO member_registrations
-       (name, photo_url, gender, age, birthplace, reg_id, join_date, marital, role, education, skill, status, bio)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,COALESCE($12,'ንቁ'),$13) RETURNING *`,
-    [name, photo_url, gender || null, age || null, birthplace || null, reg_id || null,
-     join_date || null, marital || null, role || null, education || null, skill || null,
-     status || null, bio || null]
-  );
-  res.status(201).json(rows[0]);
 });
 
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireSuperAdmin, async (req, res) => {
   await pool.query('DELETE FROM member_registrations WHERE id = $1', [req.params.id]);
   res.status(204).end();
 });
