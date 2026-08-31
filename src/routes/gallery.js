@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const pool = require('../db');
-const { requireAdmin } = require('../middleware/auth');
+const { requireSuperAdmin } = require('../middleware/auth');
 const { uploadFile } = require('../utils/storage');
 
 const router = express.Router();
@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
 
 // POST /api/gallery - admin only.
 // For photos, upload a file (field "file"). For videos, pass a "url" (e.g. YouTube embed link).
-router.post('/', requireAdmin, upload.single('file'), async (req, res) => {
+router.post('/', requireSuperAdmin, upload.single('file'), async (req, res) => {
   try {
     const { type, title, url } = req.body;
     const mediaType = type === 'video' ? 'video' : 'photo';
@@ -47,7 +47,7 @@ router.post('/', requireAdmin, upload.single('file'), async (req, res) => {
   }
 });
 
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireSuperAdmin, async (req, res) => {
   await pool.query('DELETE FROM gallery_media WHERE id = $1', [req.params.id]);
   res.status(204).end();
 });
