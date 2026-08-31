@@ -40,10 +40,11 @@ app.use('/api/content', require('./routes/content'));
 app.use('/api/gallery', require('./routes/gallery'));
 app.use('/api/comments', require('./routes/comments'));
 app.use('/api/info-board', require('./routes/infoBoard'));
+app.use('/api/news', require('./routes/news'));
 
-// news, announcements, and urgent_notices are structurally identical,
-// so they share one route factory instead of three copy-pasted files.
-app.use('/api/news', simpleCrudRouter('news'));
+// announcements and urgent_notices are structurally identical,
+// so they share one route factory instead of two copy-pasted files.
+// (news used to share this too, but now has its own file for image/PDF uploads.)
 app.use('/api/announcements', simpleCrudRouter('announcements'));
 app.use('/api/urgent', simpleCrudRouter('urgent_notices'));
 
