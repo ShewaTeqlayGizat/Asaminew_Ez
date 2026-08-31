@@ -18,6 +18,7 @@ process.on('uncaughtException', (err) => {
 });
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '2mb' }));
 
 // Only allow requests from your GitHub Pages site (and localhost for dev).
