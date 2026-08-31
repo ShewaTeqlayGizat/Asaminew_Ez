@@ -13,10 +13,10 @@ router.get('/', async (req, res) => {
   res.json(rows);
 });
 
-// POST /api/news - admin only. Optional file field "image" (photo or PDF).
+// POST /api/news - admin only. Optional file field "image" (photo or PDF), optional "video_url" text field.
 router.post('/', requireAdmin, upload.single('image'), async (req, res) => {
   try {
-    const { title, body, date } = req.body;
+    const { title, body, date, video_url } = req.body;
     if (!title) return res.status(400).json({ error: 'title required' });
 
     let file_url = null;
@@ -25,8 +25,8 @@ router.post('/', requireAdmin, upload.single('image'), async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO news (title, body, file_url, date) VALUES ($1, $2, $3, COALESCE($4, CURRENT_DATE)) RETURNING *`,
-      [title, body || null, file_url, date || null]
+      `INSERT INTO news (title, body, file_url, video_url, date) VALUES ($1, $2, $3, $4, COALESCE($5, CURRENT_DATE)) RETURNING *`,
+      [title, body || null, file_url, video_url || null, date || null]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -38,15 +38,15 @@ router.post('/', requireAdmin, upload.single('image'), async (req, res) => {
 // PUT /api/news/:id - admin only
 router.put('/:id', requireAdmin, upload.single('image'), async (req, res) => {
   try {
-    const { title, body, date } = req.body;
+    const { title, body, date, video_url } = req.body;
     let file_url = null;
     if (req.file) {
       file_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'news');
     }
     const { rows } = await pool.query(
       `UPDATE news SET title = COALESCE($1, title), body = COALESCE($2, body),
-       file_url = COALESCE($3, file_url), date = COALESCE($4, date) WHERE id = $5 RETURNING *`,
-      [title || null, body || null, file_url, date || null, req.params.id]
+       file_url = COALESCE($3, file_url), video_url = COALESCE($4, video_url), date = COALESCE($5, date) WHERE id = $6 RETURNING *`,
+      [title || null, body || null, file_url, video_url || null, date || null, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
