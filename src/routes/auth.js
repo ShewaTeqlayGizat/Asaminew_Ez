@@ -1,35 +1,82 @@
+const express = require('express');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
+const pool = require('../db');
+const { requireSuperAdmin } = require('../middleware/auth');
 
-// Protects any admin-only route: requires a valid login, but allows BOTH
-// roles (admin and moderator). Used for reading admin-only data and for
-// comment moderation, which moderators are allowed to do.
-function requireAdmin(req, res, next) {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+const router = express.Router();
 
-  if (!token) {
-    return res.status(401).json({ error: 'Missing auth token' });
+// Slow down brute-force login attempts.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many login attempts. Try again later.' },
+});
+
+// POST /api/auth/login  { username, password } -> { token, role }
+router.post('/login', loginLimiter, async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'username and password required' });
   }
 
-  try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.admin = payload; // { id, username, role }
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+  const { rows } = await pool.query(
+    'SELECT id, username, password_hash, role FROM admins WHERE username = $1',
+    [username]
+  );
+  const admin = rows[0];
+  if (!admin) return res.status(401).json({ error: 'Invalid credentials' });
+
+  const valid = await bcrypt.compare(password, admin.password_hash);
+  if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+
+  const role = admin.role || 'admin';
+  const token = jwt.sign(
+    { id: admin.id, username: admin.username, role },
+    process.env.JWT_SECRET,
+    { expiresIn: '12h' }
+  );
+
+  res.json({ token, role, username: admin.username });
+});
+
+// POST /api/auth/create-admin - full-admin ("manager") only.
+// Lets the main manager create additional accounts, including moderators
+// who can only view data and moderate comments (no upload/edit/delete).
+router.post('/create-admin', requireSuperAdmin, async (req, res) => {
+  const { username, password, role } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'username and password required' });
   }
-}
+  const finalRole = role === 'moderator' ? 'moderator' : 'admin';
 
-// Protects full-access routes only: uploading, editing, and deleting site
-// content. Moderators are logged-in admins too, but are NOT allowed here —
-// only accounts with role "admin" (the main manager) pass this check.
-function requireSuperAdmin(req, res, next) {
-  requireAdmin(req, res, () => {
-    if (req.admin.role !== 'admin') {
-      return res.status(403).json({ error: 'Full admin access required for this action' });
-    }
-    next();
-  });
-}
+  const { rows: existing } = await pool.query('SELECT id FROM admins WHERE username = $1', [username]);
+  if (existing.length) {
+    return res.status(409).json({ error: 'That username already exists' });
+  }
 
-module.exports = { requireAdmin, requireSuperAdmin };
+  const hash = await bcrypt.hash(password, 10);
+  const { rows } = await pool.query(
+    'INSERT INTO admins (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id, username, role',
+    [username, hash, finalRole]
+  );
+  res.status(201).json(rows[0]);
+});
+
+// GET /api/auth/admins - full-admin only. Lists all admin accounts (no password hashes).
+router.get('/admins', requireSuperAdmin, async (req, res) => {
+  const { rows } = await pool.query('SELECT id, username, role, created_at FROM admins ORDER BY id ASC');
+  res.json(rows);
+});
+
+// DELETE /api/auth/admins/:id - full-admin only. Removes an admin/moderator account.
+router.delete('/admins/:id', requireSuperAdmin, async (req, res) => {
+  if (String(req.admin.id) === String(req.params.id)) {
+    return res.status(400).json({ error: 'You cannot delete your own account while logged in as it.' });
+  }
+  await pool.query('DELETE FROM admins WHERE id = $1', [req.params.id]);
+  res.status(204).end();
+});
+
+module.exports = router;
