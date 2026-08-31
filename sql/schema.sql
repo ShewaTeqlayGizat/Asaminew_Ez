@@ -23,9 +23,13 @@ CREATE TABLE IF NOT EXISTS news (
   id          SERIAL PRIMARY KEY,
   title       VARCHAR(300) NOT NULL,
   body        TEXT,
+  file_url    TEXT,       -- optional attached image or PDF for the article
   date        DATE NOT NULL DEFAULT CURRENT_DATE,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- If this table already existed before file_url was added, this adds the
+-- column safely without touching existing rows.
+ALTER TABLE news ADD COLUMN IF NOT EXISTS file_url TEXT;
 
 CREATE TABLE IF NOT EXISTS announcements (
   id          SERIAL PRIMARY KEY,
@@ -99,5 +103,26 @@ CREATE TABLE IF NOT EXISTS info_board_posts (
   content     TEXT,                      -- for type='text'
   file_url    TEXT,                      -- for type='pdf', object storage URL
   date        DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Internal member registry (join requests / roster), replaces the old
+-- client-side "member database" localStorage panel inside the Special Office.
+-- Admin-only in both directions (view and edit) since it holds personal data.
+CREATE TABLE IF NOT EXISTS member_registrations (
+  id          SERIAL PRIMARY KEY,
+  name        VARCHAR(200) NOT NULL,
+  photo_url   TEXT,
+  gender      VARCHAR(20),
+  age         VARCHAR(10),
+  birthplace  VARCHAR(200),
+  reg_id      VARCHAR(100),
+  join_date   DATE,
+  marital     VARCHAR(30),
+  role        VARCHAR(200),
+  education   VARCHAR(200),
+  skill       VARCHAR(200),
+  status      VARCHAR(30) DEFAULT 'ንቁ',
+  bio         TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
