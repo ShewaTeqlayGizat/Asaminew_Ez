@@ -24,12 +24,14 @@ CREATE TABLE IF NOT EXISTS news (
   title       VARCHAR(300) NOT NULL,
   body        TEXT,
   file_url    TEXT,       -- optional attached image or PDF for the article
+  video_url   TEXT,       -- optional attached video link (e.g. YouTube) for the article
   date        DATE NOT NULL DEFAULT CURRENT_DATE,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
--- If this table already existed before file_url was added, this adds the
--- column safely without touching existing rows.
+-- If this table already existed before these columns were added, this adds
+-- them safely without touching existing rows.
 ALTER TABLE news ADD COLUMN IF NOT EXISTS file_url TEXT;
+ALTER TABLE news ADD COLUMN IF NOT EXISTS video_url TEXT;
 
 CREATE TABLE IF NOT EXISTS announcements (
   id          SERIAL PRIMARY KEY,
