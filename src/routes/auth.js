@@ -1,42 +1,35 @@
-const express = require('express');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const rateLimit = require('express-rate-limit');
-const pool = require('../db');
 
-const router = express.Router();
+// Protects any admin-only route: requires a valid login, but allows BOTH
+// roles (admin and moderator). Used for reading admin-only data and for
+// comment moderation, which moderators are allowed to do.
+function requireAdmin(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
 
-// Slow down brute-force login attempts.
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: { error: 'Too many login attempts. Try again later.' },
-});
-
-// POST /api/auth/login  { username, password } -> { token }
-router.post('/login', loginLimiter, async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: 'username and password required' });
+  if (!token) {
+    return res.status(401).json({ error: 'Missing auth token' });
   }
 
-  const { rows } = await pool.query(
-    'SELECT id, username, password_hash FROM admins WHERE username = $1',
-    [username]
-  );
-  const admin = rows[0];
-  if (!admin) return res.status(401).json({ error: 'Invalid credentials' });
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    req.admin = payload; // { id, username, role }
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
 
-  const valid = await bcrypt.compare(password, admin.password_hash);
-  if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+// Protects full-access routes only: uploading, editing, and deleting site
+// content. Moderators are logged-in admins too, but are NOT allowed here —
+// only accounts with role "admin" (the main manager) pass this check.
+function requireSuperAdmin(req, res, next) {
+  requireAdmin(req, res, () => {
+    if (req.admin.role !== 'admin') {
+      return res.status(403).json({ error: 'Full admin access required for this action' });
+    }
+    next();
+  });
+}
 
-  const token = jwt.sign(
-    { id: admin.id, username: admin.username },
-    process.env.JWT_SECRET,
-    { expiresIn: '12h' }
-  );
-
-  res.json({ token });
-});
-
-module.exports = router;
+module.exports = { requireAdmin, requireSuperAdmin };
