@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const pool = require('../db');
-const { requireAdmin } = require('../middleware/auth');
+const { requireSuperAdmin } = require('../middleware/auth');
 const { uploadFile } = require('../utils/storage');
 
 const router = express.Router();
@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/news - admin only. Optional file field "image" (photo or PDF), optional "video_url" text field.
-router.post('/', requireAdmin, upload.single('image'), async (req, res) => {
+router.post('/', requireSuperAdmin, upload.single('image'), async (req, res) => {
   try {
     const { title, body, date, video_url } = req.body;
     if (!title) return res.status(400).json({ error: 'title required' });
@@ -36,7 +36,7 @@ router.post('/', requireAdmin, upload.single('image'), async (req, res) => {
 });
 
 // PUT /api/news/:id - admin only
-router.put('/:id', requireAdmin, upload.single('image'), async (req, res) => {
+router.put('/:id', requireSuperAdmin, upload.single('image'), async (req, res) => {
   try {
     const { title, body, date, video_url } = req.body;
     let file_url = null;
@@ -57,7 +57,7 @@ router.put('/:id', requireAdmin, upload.single('image'), async (req, res) => {
 });
 
 // DELETE /api/news/:id - admin only
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireSuperAdmin, async (req, res) => {
   await pool.query('DELETE FROM news WHERE id = $1', [req.params.id]);
   res.status(204).end();
 });
