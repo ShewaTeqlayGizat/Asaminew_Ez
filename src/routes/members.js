@@ -1,6 +1,6 @@
 const express = require('express');
 const pool = require('../db');
-const { requireAdmin } = require('../middleware/auth');
+const { requireSuperAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/members - admin only
-router.post('/', requireAdmin, async (req, res) => {
+router.post('/', requireSuperAdmin, async (req, res) => {
   const { name, role, department, rank, photo_url } = req.body;
   if (!name || !role) return res.status(400).json({ error: 'name and role required' });
   const { rows } = await pool.query(
@@ -23,7 +23,7 @@ router.post('/', requireAdmin, async (req, res) => {
 });
 
 // PUT /api/members/:id - admin only
-router.put('/:id', requireAdmin, async (req, res) => {
+router.put('/:id', requireSuperAdmin, async (req, res) => {
   const { name, role, department, rank, photo_url } = req.body;
   const { rows } = await pool.query(
     `UPDATE members SET
@@ -40,7 +40,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
 });
 
 // DELETE /api/members/:id - admin only
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireSuperAdmin, async (req, res) => {
   await pool.query('DELETE FROM members WHERE id = $1', [req.params.id]);
   res.status(204).end();
 });
