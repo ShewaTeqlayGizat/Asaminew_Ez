@@ -33,7 +33,7 @@ router.post('/', requireCanCreateMembers, upload.single('photo'), async (req, re
     const { rows } = await pool.query(
       `INSERT INTO member_registrations
          (name, photo_url, gender, age, birthplace, reg_id, join_date, marital, role, education, skill, status, bio)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,COALESCE($12,'ንቁ'),$13) RETURNING *`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,COALESCE($12,'አሁንም በሥራ ላይ ነው'),$13) RETURNING *`,
       [name, photo_url, gender || null, age || null, birthplace || null, reg_id || null,
        join_date || null, marital || null, role || null, education || null, skill || null,
        status || null, bio || null]
