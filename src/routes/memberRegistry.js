@@ -3,29 +3,33 @@ const multer = require('multer');
 const pool = require('../db');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { uploadFile } = require('../utils/storage');
-
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-// This whole resource is admin-only, unlike the public content routes —
-// it holds personal data (birthplace, marital status, etc.) about members,
-// not public-facing site content, so even GET requires a login.
-
+// GET: any logged-in admin/moderator/registrar can read.
 router.get('/', requireAdmin, async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM member_registrations ORDER BY id DESC');
   res.json(rows);
 });
 
-router.post('/', requireSuperAdmin, upload.single('photo'), async (req, res) => {
+// POST: full admins AND registrars can add new members (not moderators).
+function requireCanCreateMembers(req, res, next) {
+  requireAdmin(req, res, () => {
+    if (req.admin.role !== 'admin' && req.admin.role !== 'registrar') {
+      return res.status(403).json({ error: 'Not allowed to add members' });
+    }
+    next();
+  });
+}
+
+router.post('/', requireCanCreateMembers, upload.single('photo'), async (req, res) => {
   try {
     const { name, gender, age, birthplace, reg_id, join_date, marital, role, education, skill, status, bio } = req.body;
     if (!name) return res.status(400).json({ error: 'name required' });
-
     let photo_url = null;
     if (req.file) {
       photo_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'members');
     }
-
     const { rows } = await pool.query(
       `INSERT INTO member_registrations
          (name, photo_url, gender, age, birthplace, reg_id, join_date, marital, role, education, skill, status, bio)
@@ -41,6 +45,7 @@ router.post('/', requireSuperAdmin, upload.single('photo'), async (req, res) => 
   }
 });
 
+// DELETE: full admins only.
 router.delete('/:id', requireSuperAdmin, async (req, res) => {
   await pool.query('DELETE FROM member_registrations WHERE id = $1', [req.params.id]);
   res.status(204).end();
