@@ -9,7 +9,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 
 const VALID_TYPES = [
   'library', 'eduPdf', 'eduPpt', 'eduVideo', 'eduText',
   'gazettePdf', 'gazetteText', 'entVideo', 'entCulture',
-  'channelVideo', 'liveBroadcast'
+  'channelVideo', 'liveBroadcast',
+  'financeReport', 'meetingMinutes', 'internalDoc', 'internalStats'
 ];
 
 // GET /api/content?type=xxx - public
