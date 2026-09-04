@@ -43,6 +43,7 @@ app.use('/api/comments', require('./routes/comments'));
 app.use('/api/info-board', require('./routes/infoBoard'));
 app.use('/api/news', require('./routes/news'));
 app.use('/api/students', require('./routes/students').router);
+app.use('/api/courses', require('./routes/courses'));
 
 // announcements and urgent_notices are structurally identical,
 // so they share one route factory instead of two copy-pasted files.
