@@ -22,12 +22,16 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/courses - admin (main manager) only
-router.post('/', requireSuperAdmin, async (req, res) => {
+router.post('/', requireSuperAdmin, upload.single('logo'), async (req, res) => {
   const { title, description, instructor, cover_url } = req.body;
   if (!title) return res.status(400).json({ error: 'title required' });
+  let logo_url = null;
+  if (req.file) {
+    logo_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'courses');
+  }
   const { rows } = await pool.query(
-    'INSERT INTO courses (title, description, instructor, cover_url) VALUES ($1,$2,$3,$4) RETURNING *',
-    [title, description || null, instructor || null, cover_url || null]
+    'INSERT INTO courses (title, description, instructor, cover_url, logo_url) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+    [title, description || null, instructor || null, cover_url || null, logo_url]
   );
   res.status(201).json(rows[0]);
 });
