@@ -19,7 +19,7 @@ router.get('/my', requireStudent, async (req, res) => {
 // GET /api/certificates/verify/:code - public verification by certificate code
 router.get('/verify/:code', async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT cert.certificate_code, cert.issued_at, c.title as course_title, s.full_name
+    `SELECT cert.certificate_code, cert.issued_at, c.title as course_title, c.logo_url, s.full_name
      FROM certificates cert
      JOIN courses c ON c.id = cert.course_id
      JOIN students s ON s.id = cert.student_id
