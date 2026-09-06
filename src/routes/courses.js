@@ -101,4 +101,17 @@ router.get('/my/enrolled', requireStudent, async (req, res) => {
   res.json(rows);
 });
 
+// POST /api/courses/lessons/:lessonId/complete - student marks a lesson as watched/done
+router.post('/lessons/:lessonId/complete', requireStudent, async (req, res) => {
+  try {
+    await pool.query(
+      'INSERT INTO lesson_progress (student_id, lesson_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+      [req.student.id, req.params.lessonId]
+    );
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
