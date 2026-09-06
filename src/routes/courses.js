@@ -1,8 +1,11 @@
 const express = require('express');
+const multer = require('multer');
 const pool = require('../db');
 const { requireSuperAdmin } = require('../middleware/auth');
 const { requireStudent } = require('./students');
+const { uploadFile } = require('../utils/storage');
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 // GET /api/courses - public list (student portal + landing page)
 router.get('/', async (req, res) => {
