@@ -77,4 +77,30 @@ router.get('/me', requireStudent, async (req, res) => {
   res.json(rows[0]);
 });
 
+// GET /api/students/my-results - all quiz results for logged-in student
+router.get('/my-results', requireStudent, async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT qr.*, q.title as quiz_title, q.course_id, c.title as course_title
+     FROM quiz_results qr
+     JOIN quizzes q ON q.id = qr.quiz_id
+     JOIN courses c ON c.id = q.course_id
+     WHERE qr.student_id = $1 ORDER BY qr.taken_at DESC`,
+    [req.student.id]
+  );
+  res.json(rows);
+});
+
+// GET /api/students/my-progress - lesson completion + enrollment summary
+router.get('/my-progress', requireStudent, async (req, res) => {
+  const { rows: enrolled } = await pool.query(
+    `SELECT c.id, c.title,
+       (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id) as total_lessons,
+       (SELECT COUNT(*) FROM lesson_progress lp JOIN lessons l ON l.id = lp.lesson_id WHERE l.course_id = c.id AND lp.student_id = $1) as completed_lessons
+     FROM courses c JOIN enrollments e ON e.course_id = c.id
+     WHERE e.student_id = $1`,
+    [req.student.id]
+  );
+  res.json(enrolled);
+});
+
 module.exports = { router, requireStudent };
