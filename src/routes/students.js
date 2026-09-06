@@ -30,15 +30,19 @@ function requireStudent(req, res, next) {
 }
 
 // POST /api/students/signup
-router.post('/signup', async (req, res) => {
+router.post('/signup', upload.single('photo'), async (req, res) => {
   const { full_name, email, password, phone } = req.body;
   if (!full_name || !email || !password) return res.status(400).json({ error: 'full_name, email, password required' });
   const { rows: existing } = await pool.query('SELECT id FROM students WHERE email = $1', [email]);
   if (existing.length) return res.status(409).json({ error: 'That email is already registered' });
+  let photo_url = null;
+  if (req.file) {
+    photo_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'students');
+  }
   const hash = await bcrypt.hash(password, 10);
   const { rows } = await pool.query(
-    'INSERT INTO students (full_name, email, password_hash, phone) VALUES ($1,$2,$3,$4) RETURNING id, full_name, email',
-    [full_name, email, hash, phone || null]
+    'INSERT INTO students (full_name, email, password_hash, phone, photo_url) VALUES ($1,$2,$3,$4,$5) RETURNING id, full_name, email, photo_url',
+    [full_name, email, hash, phone || null, photo_url]
   );
   const token = jwt.sign({ id: rows[0].id, email, kind: 'student' }, process.env.JWT_SECRET, { expiresIn: '30d' });
   res.status(201).json({ token, student: rows[0] });
