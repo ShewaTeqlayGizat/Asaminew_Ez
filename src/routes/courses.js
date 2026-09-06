@@ -22,16 +22,28 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/courses - admin (main manager) only
-router.post('/', requireSuperAdmin, upload.single('logo'), async (req, res) => {
+const uploadCourseFiles = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } })
+  .fields([{ name: 'logo', maxCount: 1 }, { name: 'stamp', maxCount: 1 }, { name: 'signature', maxCount: 1 }]);
+
+router.post('/', requireSuperAdmin, uploadCourseFiles, async (req, res) => {
   const { title, description, instructor, cover_url } = req.body;
   if (!title) return res.status(400).json({ error: 'title required' });
-  let logo_url = null;
-  if (req.file) {
-    logo_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'courses');
+  let logo_url = null, stamp_url = null, signature_url = null;
+  if (req.files?.logo?.[0]) {
+    const f = req.files.logo[0];
+    logo_url = await uploadFile(f.buffer, f.originalname, f.mimetype, 'courses');
+  }
+  if (req.files?.stamp?.[0]) {
+    const f = req.files.stamp[0];
+    stamp_url = await uploadFile(f.buffer, f.originalname, f.mimetype, 'courses');
+  }
+  if (req.files?.signature?.[0]) {
+    const f = req.files.signature[0];
+    signature_url = await uploadFile(f.buffer, f.originalname, f.mimetype, 'courses');
   }
   const { rows } = await pool.query(
-    'INSERT INTO courses (title, description, instructor, cover_url, logo_url) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-    [title, description || null, instructor || null, cover_url || null, logo_url]
+    'INSERT INTO courses (title, description, instructor, cover_url, logo_url, stamp_url, signature_url) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+    [title, description || null, instructor || null, cover_url || null, logo_url, stamp_url, signature_url]
   );
   res.status(201).json(rows[0]);
 });
