@@ -73,8 +73,8 @@ router.post('/login', loginLimiter, async (req, res) => {
   }
 
   await pool.query('UPDATE students SET failed_attempts=0, locked_until=NULL WHERE id=$1', [student.id]);
-  const token = jwt.sign({ id: student.id, email: student.email, kind: 'student' }, process.env.JWT_SECRET, { expiresIn: '30d' });
-  res.json({ token, student: { id: student.id, full_name: student.full_name, email: student.email } });
+    const token = jwt.sign({ id: student.id, email: student.email, kind: 'student' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+  res.json({ token, student: { id: student.id, full_name: student.full_name, email: student.email, photo_url: student.photo_url } });
 });
 
 // GET /api/students/me - current student profile
