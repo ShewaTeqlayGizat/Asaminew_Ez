@@ -79,7 +79,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 
 // GET /api/students/me - current student profile
 router.get('/me', requireStudent, async (req, res) => {
-  const { rows } = await pool.query('SELECT id, full_name, email, phone, created_at FROM students WHERE id=$1', [req.student.id]);
+  const { rows } = await pool.query('SELECT id, full_name, email, phone, photo_url, created_at FROM students WHERE id=$1', [req.student.id]);
   if (!rows[0]) return res.status(404).json({ error: 'Not found' });
   res.json(rows[0]);
 });
