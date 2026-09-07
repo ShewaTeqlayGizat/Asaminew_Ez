@@ -23,12 +23,12 @@ router.get('/:id', async (req, res) => {
 
 // POST /api/courses - admin (main manager) only
 const uploadCourseFiles = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } })
-  .fields([{ name: 'logo', maxCount: 1 }, { name: 'stamp', maxCount: 1 }, { name: 'signature', maxCount: 1 }]);
+  .fields([{ name: 'logo', maxCount: 1 }, { name: 'stamp', maxCount: 1 }, { name: 'signature', maxCount: 1 }, { name: 'signature2', maxCount: 1 }]);
 
 router.post('/', requireSuperAdmin, uploadCourseFiles, async (req, res) => {
-  const { title, description, instructor, cover_url } = req.body;
+  const { title, description, instructor, cover_url, signature2_name } = req.body;
   if (!title) return res.status(400).json({ error: 'title required' });
-  let logo_url = null, stamp_url = null, signature_url = null;
+  let logo_url = null, stamp_url = null, signature_url = null, signature2_url = null;
   if (req.files?.logo?.[0]) {
     const f = req.files.logo[0];
     logo_url = await uploadFile(f.buffer, f.originalname, f.mimetype, 'courses');
@@ -41,9 +41,13 @@ router.post('/', requireSuperAdmin, uploadCourseFiles, async (req, res) => {
     const f = req.files.signature[0];
     signature_url = await uploadFile(f.buffer, f.originalname, f.mimetype, 'courses');
   }
+  if (req.files?.signature2?.[0]) {
+    const f = req.files.signature2[0];
+    signature2_url = await uploadFile(f.buffer, f.originalname, f.mimetype, 'courses');
+  }
   const { rows } = await pool.query(
-    'INSERT INTO courses (title, description, instructor, cover_url, logo_url, stamp_url, signature_url) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
-    [title, description || null, instructor || null, cover_url || null, logo_url, stamp_url, signature_url]
+    'INSERT INTO courses (title, description, instructor, cover_url, logo_url, stamp_url, signature_url, signature2_name, signature2_url) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
+    [title, description || null, instructor || null, cover_url || null, logo_url, stamp_url, signature_url, signature2_name || null, signature2_url]
   );
   res.status(201).json(rows[0]);
 });
