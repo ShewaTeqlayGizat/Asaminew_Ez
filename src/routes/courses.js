@@ -1,8 +1,18 @@
 const express = require('express');
 const multer = require('multer');
 const pool = require('../db');
-const { requireSuperAdmin } = require('../middleware/auth');
+const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { requireStudent } = require('./students');
+
+// Full admin OR bootcamp_admin can manage bootcamp content.
+function requireBootcampAdmin(req, res, next) {
+  requireAdmin(req, res, () => {
+    if (req.admin.role !== 'admin' && req.admin.role !== 'bootcamp_admin') {
+      return res.status(403).json({ error: 'Bootcamp admin access required' });
+    }
+    next();
+  });
+}
 const { uploadFile } = require('../utils/storage');
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
