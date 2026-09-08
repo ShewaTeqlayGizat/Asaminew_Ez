@@ -65,7 +65,7 @@ router.post('/create-admin', requireSuperAdmin, async (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ error: 'username and password required' });
   }
- const allowedRoles = ['admin', 'moderator', 'registrar'];
+ const allowedRoles = ['admin', 'moderator', 'registrar', 'bootcamp_admin'];
   const finalRole = allowedRoles.includes(role) ? role : 'admin';
   const { rows: existing } = await pool.query('SELECT id FROM admins WHERE username = $1', [username]);
   if (existing.length) {
