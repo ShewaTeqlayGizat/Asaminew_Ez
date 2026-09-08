@@ -110,4 +110,38 @@ router.get('/my-progress', requireStudent, async (req, res) => {
   res.json(enrolled);
 });
 
+// POST /api/students/admin-create - admin/bootcamp_admin only. Register a student on their behalf.
+function requireAdminForStudentCreate(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Missing auth token' });
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    if (payload.role !== 'admin' && payload.role !== 'bootcamp_admin') {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+    req.admin = payload;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+router.post('/admin-create', requireAdminForStudentCreate, upload.single('photo'), async (req, res) => {
+  const { full_name, email, password, phone } = req.body;
+  if (!full_name || !email || !password) return res.status(400).json({ error: 'full_name, email, password required' });
+  const { rows: existing } = await pool.query('SELECT id FROM students WHERE email = $1', [email]);
+  if (existing.length) return res.status(409).json({ error: 'That email is already registered' });
+  let photo_url = null;
+  if (req.file) {
+    photo_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'students');
+  }
+  const hash = await bcrypt.hash(password, 10);
+  const { rows } = await pool.query(
+    'INSERT INTO students (full_name, email, password_hash, phone, photo_url) VALUES ($1,$2,$3,$4,$5) RETURNING id, full_name, email',
+    [full_name, email, hash, phone || null, photo_url]
+  );
+  res.status(201).json({ student: rows[0] });
+});
+
 module.exports = { router, requireStudent };
