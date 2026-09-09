@@ -128,7 +128,7 @@ function requireAdminForStudentCreate(req, res, next) {
 }
 
 router.post('/admin-create', requireAdminForStudentCreate, upload.single('photo'), async (req, res) => {
-  const { full_name, email, password, phone } = req.body;
+  const { full_name, email, password, phone, course_id } = req.body;
   if (!full_name || !email || !password) return res.status(400).json({ error: 'full_name, email, password required' });
   const { rows: existing } = await pool.query('SELECT id FROM students WHERE email = $1', [email]);
   if (existing.length) return res.status(409).json({ error: 'That email is already registered' });
@@ -141,7 +141,16 @@ router.post('/admin-create', requireAdminForStudentCreate, upload.single('photo'
     'INSERT INTO students (full_name, email, password_hash, phone, photo_url) VALUES ($1,$2,$3,$4,$5) RETURNING id, full_name, email',
     [full_name, email, hash, phone || null, photo_url]
   );
-  res.status(201).json({ student: rows[0] });
+  const student = rows[0];
+  if (course_id) {
+    try {
+      await pool.query(
+        'INSERT INTO enrollments (student_id, course_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+        [student.id, course_id]
+      );
+    } catch (err) { console.error('Enrollment failed:', err); }
+  }
+  res.status(201).json({ student });
 });
 
 module.exports = { router, requireStudent };
