@@ -1,18 +1,9 @@
 const express = require('express');
 const crypto = require('crypto');
 const pool = require('../db');
-const { requireAdmin } = require('../middleware/auth');
+const { requireSuperAdmin } = require('../middleware/auth');
 const { requireStudent } = require('./students');
 const router = express.Router();
-
-function requireBootcampAdmin(req, res, next) {
-  requireAdmin(req, res, () => {
-    if (req.admin.role !== 'admin' && req.admin.role !== 'bootcamp_admin') {
-      return res.status(403).json({ error: 'Bootcamp admin access required' });
-    }
-    next();
-  });
-}
 
 // GET /api/certificates/my - student's own certificates
 router.get('/my', requireStudent, async (req, res) => {
@@ -39,8 +30,8 @@ router.get('/verify/:code', async (req, res) => {
   res.json(rows[0]);
 });
 
-// POST /api/certificates/issue - bootcamp admin only
-router.post('/issue', requireBootcampAdmin, async (req, res) => {
+// POST /api/certificates/issue - full admin only
+router.post('/issue', requireSuperAdmin, async (req, res) => {
   const { student_id, course_id } = req.body;
   if (!student_id || !course_id) return res.status(400).json({ error: 'student_id and course_id required' });
   const code = crypto.randomBytes(6).toString('hex').toUpperCase();
@@ -55,8 +46,8 @@ router.post('/issue', requireBootcampAdmin, async (req, res) => {
   }
 });
 
-// GET /api/certificates/eligible-students?course_id=X - bootcamp admin only
-router.get('/eligible-students', requireBootcampAdmin, async (req, res) => {
+// GET /api/certificates/eligible-students?course_id=X - full admin only
+router.get('/eligible-students', requireSuperAdmin, async (req, res) => {
   const { course_id } = req.query;
   if (!course_id) return res.status(400).json({ error: 'course_id required' });
   const { rows } = await pool.query(
