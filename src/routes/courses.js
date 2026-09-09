@@ -6,16 +6,6 @@ const { requireStudent } = require('./students');
 const { uploadFile } = require('../utils/storage');
 const router = express.Router();
 
-// Full admin OR bootcamp_admin can manage bootcamp content.
-function requireBootcampAdmin(req, res, next) {
-  requireAdmin(req, res, () => {
-    if (req.admin.role !== 'admin' && req.admin.role !== 'bootcamp_admin') {
-      return res.status(403).json({ error: 'Bootcamp admin access required' });
-    }
-    next();
-  });
-}
-
 const uploadCourseFiles = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } })
   .fields([{ name: 'logo', maxCount: 1 }, { name: 'stamp', maxCount: 1 }, { name: 'signature', maxCount: 1 }, { name: 'signature2', maxCount: 1 }]);
 
@@ -33,8 +23,8 @@ router.get('/:id', async (req, res) => {
   res.json({ ...courseRows[0], lessons });
 });
 
-// POST /api/courses - bootcamp admin only
-router.post('/', requireBootcampAdmin, uploadCourseFiles, async (req, res) => {
+// POST /api/courses - full admin only
+router.post('/', requireSuperAdmin, uploadCourseFiles, async (req, res) => {
   const { title, description, instructor, cover_url, signature2_name } = req.body;
   if (!title) return res.status(400).json({ error: 'title required' });
   let logo_url = null, stamp_url = null, signature_url = null, signature2_url = null;
@@ -61,8 +51,8 @@ router.post('/', requireBootcampAdmin, uploadCourseFiles, async (req, res) => {
   res.status(201).json(rows[0]);
 });
 
-// PUT /api/courses/:id - bootcamp admin only
-router.put('/:id', requireBootcampAdmin, async (req, res) => {
+// PUT /api/courses/:id - full admin only
+router.put('/:id', requireSuperAdmin, async (req, res) => {
   const { title, description, instructor, cover_url } = req.body;
   const { rows } = await pool.query(
     `UPDATE courses SET title=COALESCE($1,title), description=COALESCE($2,description),
@@ -73,16 +63,15 @@ router.put('/:id', requireBootcampAdmin, async (req, res) => {
   res.json(rows[0]);
 });
 
-// DELETE /api/courses/:id - bootcamp admin only
-router.delete('/:id', requireBootcampAdmin, async (req, res) => {
+// DELETE /api/courses/:id - full admin only
+router.delete('/:id', requireSuperAdmin, async (req, res) => {
   await pool.query('DELETE FROM courses WHERE id=$1', [req.params.id]);
   res.status(204).end();
 });
 
 // ---- Lessons (video) ----
 
-// POST /api/courses/:id/lessons - bootcamp admin only
-router.post('/:id/lessons', requireBootcampAdmin, async (req, res) => {
+router.post('/:id/lessons', requireSuperAdmin, async (req, res) => {
   const { title, video_url, position } = req.body;
   if (!title || !video_url) return res.status(400).json({ error: 'title and video_url required' });
   const { rows } = await pool.query(
@@ -92,8 +81,7 @@ router.post('/:id/lessons', requireBootcampAdmin, async (req, res) => {
   res.status(201).json(rows[0]);
 });
 
-// PUT /api/courses/lessons/:lessonId - bootcamp admin only
-router.put('/lessons/:lessonId', requireBootcampAdmin, async (req, res) => {
+router.put('/lessons/:lessonId', requireSuperAdmin, async (req, res) => {
   const { title, video_url, position } = req.body;
   const { rows } = await pool.query(
     `UPDATE lessons SET title=COALESCE($1,title), video_url=COALESCE($2,video_url), position=COALESCE($3,position) WHERE id=$4 RETURNING *`,
@@ -103,15 +91,13 @@ router.put('/lessons/:lessonId', requireBootcampAdmin, async (req, res) => {
   res.json(rows[0]);
 });
 
-// DELETE /api/courses/lessons/:lessonId - bootcamp admin only
-router.delete('/lessons/:lessonId', requireBootcampAdmin, async (req, res) => {
+router.delete('/lessons/:lessonId', requireSuperAdmin, async (req, res) => {
   await pool.query('DELETE FROM lessons WHERE id=$1', [req.params.lessonId]);
   res.status(204).end();
 });
 
 // ---- Enrollment (student joins a course) ----
 
-// POST /api/courses/:id/enroll - student only
 router.post('/:id/enroll', requireStudent, async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -124,7 +110,6 @@ router.post('/:id/enroll', requireStudent, async (req, res) => {
   }
 });
 
-// GET /api/courses/my/enrolled - student only.
 router.get('/my/enrolled', requireStudent, async (req, res) => {
   const { rows } = await pool.query(
     `SELECT c.* FROM courses c JOIN enrollments e ON e.course_id = c.id WHERE e.student_id = $1`,
@@ -133,7 +118,6 @@ router.get('/my/enrolled', requireStudent, async (req, res) => {
   res.json(rows);
 });
 
-// POST /api/courses/lessons/:lessonId/complete - student marks a lesson as watched/done
 router.post('/lessons/:lessonId/complete', requireStudent, async (req, res) => {
   try {
     await pool.query(
