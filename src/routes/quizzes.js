@@ -1,17 +1,8 @@
 const express = require('express');
 const pool = require('../db');
-const { requireAdmin } = require('../middleware/auth');
+const { requireSuperAdmin } = require('../middleware/auth');
 const { requireStudent } = require('./students');
 const router = express.Router();
-
-function requireBootcampAdmin(req, res, next) {
-  requireAdmin(req, res, () => {
-    if (req.admin.role !== 'admin' && req.admin.role !== 'bootcamp_admin') {
-      return res.status(403).json({ error: 'Bootcamp admin access required' });
-    }
-    next();
-  });
-}
 
 // GET /api/quizzes?course_id=X - list quizzes for a course (public/student)
 router.get('/', async (req, res) => {
@@ -21,7 +12,7 @@ router.get('/', async (req, res) => {
   res.json(rows);
 });
 
-// GET /api/quizzes/:id - quiz with questions (no correct_option revealed to students)
+// GET /api/quizzes/:id - quiz with questions (student view, no answers)
 router.get('/:id', requireStudent, async (req, res) => {
   const { rows: quizRows } = await pool.query('SELECT * FROM quizzes WHERE id=$1', [req.params.id]);
   if (!quizRows[0]) return res.status(404).json({ error: 'Quiz not found' });
@@ -32,30 +23,30 @@ router.get('/:id', requireStudent, async (req, res) => {
   res.json({ ...quizRows[0], questions });
 });
 
-// GET /api/quizzes/:id/admin - admin view WITH correct answers (for editing)
-router.get('/:id/admin', requireBootcampAdmin, async (req, res) => {
+// GET /api/quizzes/:id/admin - full admin only (with correct answers)
+router.get('/:id/admin', requireSuperAdmin, async (req, res) => {
   const { rows: quizRows } = await pool.query('SELECT * FROM quizzes WHERE id=$1', [req.params.id]);
   if (!quizRows[0]) return res.status(404).json({ error: 'Quiz not found' });
   const { rows: questions } = await pool.query('SELECT * FROM quiz_questions WHERE quiz_id=$1 ORDER BY id ASC', [req.params.id]);
   res.json({ ...quizRows[0], questions });
 });
 
-// POST /api/quizzes - bootcamp admin only
-router.post('/', requireBootcampAdmin, async (req, res) => {
+// POST /api/quizzes - full admin only
+router.post('/', requireSuperAdmin, async (req, res) => {
   const { course_id, title } = req.body;
   if (!course_id || !title) return res.status(400).json({ error: 'course_id and title required' });
   const { rows } = await pool.query('INSERT INTO quizzes (course_id, title) VALUES ($1,$2) RETURNING *', [course_id, title]);
   res.status(201).json(rows[0]);
 });
 
-// DELETE /api/quizzes/:id - bootcamp admin only
-router.delete('/:id', requireBootcampAdmin, async (req, res) => {
+// DELETE /api/quizzes/:id - full admin only
+router.delete('/:id', requireSuperAdmin, async (req, res) => {
   await pool.query('DELETE FROM quizzes WHERE id=$1', [req.params.id]);
   res.status(204).end();
 });
 
-// POST /api/quizzes/:id/questions - bootcamp admin only
-router.post('/:id/questions', requireBootcampAdmin, async (req, res) => {
+// POST /api/quizzes/:id/questions - full admin only
+router.post('/:id/questions', requireSuperAdmin, async (req, res) => {
   const { question, option_a, option_b, option_c, option_d, correct_option } = req.body;
   if (!question || !correct_option) return res.status(400).json({ error: 'question and correct_option required' });
   const { rows } = await pool.query(
@@ -66,8 +57,8 @@ router.post('/:id/questions', requireBootcampAdmin, async (req, res) => {
   res.status(201).json(rows[0]);
 });
 
-// DELETE /api/quizzes/questions/:qId - bootcamp admin only
-router.delete('/questions/:qId', requireBootcampAdmin, async (req, res) => {
+// DELETE /api/quizzes/questions/:qId - full admin only
+router.delete('/questions/:qId', requireSuperAdmin, async (req, res) => {
   await pool.query('DELETE FROM quiz_questions WHERE id=$1', [req.params.qId]);
   res.status(204).end();
 });
