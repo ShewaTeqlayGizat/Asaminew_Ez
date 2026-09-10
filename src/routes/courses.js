@@ -91,11 +91,16 @@ router.post('/:id/lessons', requireSuperAdmin, uploadLessonFile, async (req, res
   res.status(201).json(rows[0]);
 });
 
-router.put('/lessons/:lessonId', requireSuperAdmin, async (req, res) => {
-  const { title, video_url, position } = req.body;
+router.put('/lessons/:lessonId', requireSuperAdmin, uploadLessonFile, async (req, res) => {
+  const { title, video_url, position, lesson_type } = req.body;
+  let file_url = null;
+  if (req.file) {
+    file_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'lessons');
+  }
   const { rows } = await pool.query(
-    `UPDATE lessons SET title=COALESCE($1,title), video_url=COALESCE($2,video_url), position=COALESCE($3,position) WHERE id=$4 RETURNING *`,
-    [title || null, video_url || null, position || null, req.params.lessonId]
+    `UPDATE lessons SET title=COALESCE($1,title), video_url=COALESCE($2,video_url),
+     file_url=COALESCE($3,file_url), lesson_type=COALESCE($4,lesson_type), position=COALESCE($5,position) WHERE id=$6 RETURNING *`,
+    [title || null, video_url || null, file_url, lesson_type || null, position || null, req.params.lessonId]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Not found' });
   res.json(rows[0]);
