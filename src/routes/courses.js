@@ -71,12 +71,22 @@ router.delete('/:id', requireSuperAdmin, async (req, res) => {
 
 // ---- Lessons (video) ----
 
-router.post('/:id/lessons', requireSuperAdmin, async (req, res) => {
-  const { title, video_url, position } = req.body;
-  if (!title || !video_url) return res.status(400).json({ error: 'title and video_url required' });
+const uploadLessonFile = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } }).single('file');
+
+router.post('/:id/lessons', requireSuperAdmin, uploadLessonFile, async (req, res) => {
+  const { title, video_url, position, lesson_type } = req.body;
+  if (!title) return res.status(400).json({ error: 'title required' });
+  const type = lesson_type || 'video_url';
+  if (type === 'video_url' && !video_url) return res.status(400).json({ error: 'video_url required for this type' });
+  if ((type === 'video' || type === 'pdf' || type === 'audio') && !req.file) return res.status(400).json({ error: 'file required for this type' });
+
+  let file_url = null;
+  if (req.file) {
+    file_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'lessons');
+  }
   const { rows } = await pool.query(
-    'INSERT INTO lessons (course_id, title, video_url, position) VALUES ($1,$2,$3,$4) RETURNING *',
-    [req.params.id, title, video_url, position || 0]
+    'INSERT INTO lessons (course_id, title, video_url, file_url, lesson_type, position) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+    [req.params.id, title, video_url || null, file_url, type, position || 0]
   );
   res.status(201).json(rows[0]);
 });
