@@ -181,8 +181,8 @@ function requireBootcampOrAdmin(req, res, next) {
 // GET /api/courses/:id/roster - bootcamp admin/full admin only. Full student list with status for this course.
 router.get('/:id/roster', requireBootcampOrAdmin, async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT s.id, s.full_name, s.email, s.gender, s.age, s.category, s.photo_url,
-            e.status, e.enrolled_at,
+    `SELECT s.id, s.full_name, s.email, s.gender, s.age, s.category, s.institution, s.photo_url,
+            e.status, e.result, e.enrolled_at,
             (SELECT COUNT(*) FROM lessons l WHERE l.course_id = $1) as total_lessons,
             (SELECT COUNT(*) FROM lesson_progress lp JOIN lessons l ON l.id = lp.lesson_id WHERE l.course_id = $1 AND lp.student_id = s.id) as completed_lessons
      FROM students s
