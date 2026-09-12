@@ -153,5 +153,3 @@ router.post('/admin-create', requireAdminForStudentCreate, upload.single('photo'
   res.status(201).json({ student });
 });
 
-
-module.exports = router;
