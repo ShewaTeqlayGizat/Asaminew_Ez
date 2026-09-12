@@ -179,7 +179,7 @@ router.get('/:id/roster', requireBootcampOrAdmin, async (req, res) => {
 });
 
 // PUT /api/courses/:id/roster/:studentId - bootcamp admin/full admin only. Update a student's status for this course.
-router.put('/:id/roster/:studentId', requireBootcampOrAdmin, async (req, res) => {
+router.put('/:id/roster/:studentId', requireSuperAdmin, async (req, res) => {
   const { status } = req.body;
   const validStatuses = ['active', 'completed', 'repeating', 'dropped', 'suspended'];
   if (!validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid status' });
