@@ -153,42 +153,5 @@ router.post('/admin-create', requireAdminForStudentCreate, upload.single('photo'
   res.status(201).json({ student });
 });
 
-// GET /api/courses/:id/roster - bootcamp admin/full admin only. Full student list with status for this course.
-function requireBootcampOrAdmin(req, res, next) {
-  requireAdmin(req, res, () => {
-    if (req.admin.role !== 'admin' && req.admin.role !== 'bootcamp_admin') {
-      return res.status(403).json({ error: 'Not allowed' });
-    }
-    next();
-  });
-}
-
-router.get('/:id/roster', requireBootcampOrAdmin, async (req, res) => {
-  const { rows } = await pool.query(
-    `SELECT s.id, s.full_name, s.email, s.gender, s.age, s.category, s.photo_url,
-            e.status, e.enrolled_at,
-            (SELECT COUNT(*) FROM lessons l WHERE l.course_id = $1) as total_lessons,
-            (SELECT COUNT(*) FROM lesson_progress lp JOIN lessons l ON l.id = lp.lesson_id WHERE l.course_id = $1 AND lp.student_id = s.id) as completed_lessons
-     FROM students s
-     JOIN enrollments e ON e.student_id = s.id
-     WHERE e.course_id = $1
-     ORDER BY s.full_name ASC`,
-    [req.params.id]
-  );
-  res.json(rows);
-});
-
-// PUT /api/courses/:id/roster/:studentId - bootcamp admin/full admin only. Update a student's status for this course.
-router.put('/:id/roster/:studentId', requireBootcampOrAdmin, async (req, res) => {
-  const { status } = req.body;
-  const validStatuses = ['active', 'completed', 'repeating', 'dropped', 'suspended'];
-  if (!validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid status' });
-  const { rows } = await pool.query(
-    'UPDATE enrollments SET status=$1 WHERE course_id=$2 AND student_id=$3 RETURNING *',
-    [status, req.params.id, req.params.studentId]
-  );
-  if (!rows[0]) return res.status(404).json({ error: 'Enrollment not found' });
-  res.json(rows[0]);
-});
 
 module.exports = router;
