@@ -29,6 +29,7 @@ function requireStudent(req, res, next) {
   }
 }
 
+
 // POST /api/students/signup
 router.post('/signup', upload.single('photo'), async (req, res) => {
   const { full_name, email, password, phone } = req.body;
@@ -50,9 +51,9 @@ router.post('/signup', upload.single('photo'), async (req, res) => {
 
 // POST /api/students/login
 router.post('/login', loginLimiter, async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: 'email and password required' });
-  const { rows } = await pool.query('SELECT * FROM students WHERE email = $1', [email]);
+  const { full_name, password } = req.body;
+  if (!full_name || !password) return res.status(400).json({ error: 'full_name and password required' });
+  const { rows } = await pool.query('SELECT * FROM students WHERE full_name = $1', [full_name]);
   const student = rows[0];
   if (!student) return res.status(401).json({ error: 'Invalid credentials' });
 
@@ -130,8 +131,8 @@ function requireAdminForStudentCreate(req, res, next) {
 router.post('/admin-create', requireAdminForStudentCreate, upload.single('photo'), async (req, res) => {
   const { full_name, email, password, phone, course_id, gender, age, category, institution } = req.body;
   if (!full_name || !email || !password) return res.status(400).json({ error: 'full_name, email, password required' });
-  const { rows: existing } = await pool.query('SELECT id FROM students WHERE email = $1', [email]);
-  if (existing.length) return res.status(409).json({ error: 'That email is already registered' });
+  const { rows: existing } = await pool.query('SELECT id FROM students WHERE email = $1 OR full_name = $2', [email, full_name]);
+  if (existing.length) return res.status(409).json({ error: 'That email or name is already registered' });
   let photo_url = null;
   if (req.file) {
     photo_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'students');
