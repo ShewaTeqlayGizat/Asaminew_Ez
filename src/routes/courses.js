@@ -1,4 +1,5 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const pool = require('../db');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
@@ -15,8 +16,29 @@ router.get('/', async (req, res) => {
   res.json(rows);
 });
 
-// GET /api/courses/:id - single course with its lessons
+// GET /api/courses/:id - single course with its lessons. Admins get full access;
+// students must be enrolled to view a specific course's lessons.
 router.get('/:id', async (req, res) => {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Login required' });
+
+  let payload;
+  try {
+    payload = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  if (payload.kind === 'student') {
+    const { rows: enr } = await pool.query(
+      'SELECT 1 FROM enrollments WHERE student_id=$1 AND course_id=$2',
+      [payload.id, req.params.id]
+    );
+    if (!enr.length) return res.status(403).json({ error: 'You are not enrolled in this course' });
+  }
+  // Non-student (admin/bootcamp_admin/moderator) tokens pass through freely.
+
   const { rows: courseRows } = await pool.query('SELECT * FROM courses WHERE id=$1', [req.params.id]);
   if (!courseRows[0]) return res.status(404).json({ error: 'Course not found' });
   const { rows: lessons } = await pool.query('SELECT * FROM lessons WHERE course_id=$1 ORDER BY position ASC, id ASC', [req.params.id]);

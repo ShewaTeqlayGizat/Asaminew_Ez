@@ -12,10 +12,17 @@ router.get('/', async (req, res) => {
   res.json(rows);
 });
 
-// GET /api/quizzes/:id - quiz with questions (student view, no answers)
+// GET /api/quizzes/:id - quiz with questions. Student must be enrolled in the quiz's course.
 router.get('/:id', requireStudent, async (req, res) => {
   const { rows: quizRows } = await pool.query('SELECT * FROM quizzes WHERE id=$1', [req.params.id]);
   if (!quizRows[0]) return res.status(404).json({ error: 'Quiz not found' });
+
+  const { rows: enr } = await pool.query(
+    'SELECT 1 FROM enrollments WHERE student_id=$1 AND course_id=$2',
+    [req.student.id, quizRows[0].course_id]
+  );
+  if (!enr.length) return res.status(403).json({ error: 'You are not enrolled in this course' });
+
   const { rows: questions } = await pool.query(
     'SELECT id, question, option_a, option_b, option_c, option_d FROM quiz_questions WHERE quiz_id=$1 ORDER BY id ASC',
     [req.params.id]
@@ -63,10 +70,19 @@ router.delete('/questions/:qId', requireSuperAdmin, async (req, res) => {
   res.status(204).end();
 });
 
-// POST /api/quizzes/:id/submit - student only
+// POST /api/quizzes/:id/submit - student only, must be enrolled
 router.post('/:id/submit', requireStudent, async (req, res) => {
   const { answers } = req.body;
   if (!answers) return res.status(400).json({ error: 'answers required' });
+
+  const { rows: quizRows } = await pool.query('SELECT course_id FROM quizzes WHERE id=$1', [req.params.id]);
+  if (!quizRows[0]) return res.status(404).json({ error: 'Quiz not found' });
+  const { rows: enr } = await pool.query(
+    'SELECT 1 FROM enrollments WHERE student_id=$1 AND course_id=$2',
+    [req.student.id, quizRows[0].course_id]
+  );
+  if (!enr.length) return res.status(403).json({ error: 'You are not enrolled in this course' });
+
   const { rows: questions } = await pool.query('SELECT id, correct_option FROM quiz_questions WHERE quiz_id=$1', [req.params.id]);
   let score = 0;
   questions.forEach(q => { if ((answers[q.id] || '').toUpperCase() === q.correct_option) score++; });
