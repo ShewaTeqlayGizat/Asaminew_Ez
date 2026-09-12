@@ -196,12 +196,14 @@ router.get('/:id/roster', requireBootcampOrAdmin, async (req, res) => {
 
 // PUT /api/courses/:id/roster/:studentId - bootcamp admin/full admin only. Update a student's status for this course.
 router.put('/:id/roster/:studentId', requireBootcampOrAdmin, async (req, res) => {
-  const { status } = req.body;
+  const { status, result } = req.body;
   const validStatuses = ['active', 'completed', 'repeating', 'dropped', 'suspended'];
-  if (!validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+  const validResults = ['passed', 'failed', 'repeat', null, ''];
+  if (status && !validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+  if (result && !validResults.includes(result)) return res.status(400).json({ error: 'Invalid result' });
   const { rows } = await pool.query(
-    'UPDATE enrollments SET status=$1 WHERE course_id=$2 AND student_id=$3 RETURNING *',
-    [status, req.params.id, req.params.studentId]
+    'UPDATE enrollments SET status=COALESCE($1,status), result=COALESCE($2,result) WHERE course_id=$3 AND student_id=$4 RETURNING *',
+    [status || null, result || null, req.params.id, req.params.studentId]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Enrollment not found' });
   res.json(rows[0]);
