@@ -34,8 +34,8 @@ function requireStudent(req, res, next) {
 router.post('/signup', upload.single('photo'), async (req, res) => {
   const { full_name, email, password, phone } = req.body;
   if (!full_name || !email || !password) return res.status(400).json({ error: 'full_name, email, password required' });
-  const { rows: existing } = await pool.query('SELECT id FROM students WHERE email = $1', [email]);
-  if (existing.length) return res.status(409).json({ error: 'That email is already registered' });
+  const { rows: existing } = await pool.query('SELECT id FROM students WHERE email = $1 OR full_name = $2', [email, full_name]);
+  if (existing.length) return res.status(409).json({ error: 'That email or name is already registered' });
   let photo_url = null;
   if (req.file) {
     photo_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'students');
