@@ -171,7 +171,7 @@ router.post('/lessons/:lessonId/complete', requireStudent, async (req, res) => {
 const password = document.getElementById("csPassword").value;
       const gender = document.getElementById("csGender").value;
       const age = document.getElementById("csAge").value;
-      cofunction requireBootcampOrAdmin(req, res, next) {
+      function requireBootcampOrAdmin(req, res, next) {
   requireAdmin(req, res, () => {
     if (req.admin.role !== 'admin' && req.admin.role !== 'bootcamp_admin') {
       return res.status(403).json({ error: 'Not allowed' });
