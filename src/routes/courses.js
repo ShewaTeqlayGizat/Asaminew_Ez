@@ -168,7 +168,37 @@ router.post('/lessons/:lessonId/complete', requireStudent, async (req, res) => {
 });
 
 // GET /api/courses/:id/roster - bootcamp admin/full admin only. Full student list with status for this course.
-router.get('/:id/roster', requireSuperAdmin, async (req, res) => {
+const password = document.getElementById("csPassword").value;
+      const gender = document.getElementById("csGender").value;
+      const age = document.getElementById("csAge").value;
+      cofunction requireBootcampOrAdmin(req, res, next) {
+  requireAdmin(req, res, () => {
+    if (req.admin.role !== 'admin' && req.admin.role !== 'bootcamp_admin') {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+    next();
+  });
+}
+
+router.get('/:id/roster', requireBootcampOrAdmin, async (req, res) => {nst category = document.getElementById("csCategory").value.trim();
+      const photoFile = document.getElementById("csPhoto").files[0];
+      const course_id = document.getElementById("csCourse").value;
+      const status = document.getElementById("csStatus");
+      if (!full_name || !email || !password) return;
+      if (!course_id) { status.textContent = "እባክዎ ኮርስ ይምረጡ።"; return; }
+      status.textContent = "እየተመዘገበ ነው...";
+      try {
+        const token = getAdminToken();
+        const fd = new FormData();
+        fd.append("full_name", full_name);
+        fd.append("email", email);
+        fd.append("phone", phone);
+        fd.append("password", password);
+        fd.append("course_id", course_id);
+        if (gender) fd.append("gender", gender);
+        if (age) fd.append("age", age);
+        if (category) fd.append("category", category);
+        if (photoFile) fd.append("photo", photoFile);
   const { rows } = await pool.query(
     `SELECT s.id, s.full_name, s.email, s.gender, s.age, s.category, s.photo_url,
             e.status, e.enrolled_at,
