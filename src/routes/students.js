@@ -153,4 +153,17 @@ router.post('/admin-create', requireAdminForStudentCreate, upload.single('photo'
   res.status(201).json({ student });
 });
 
+// PUT /api/students/:id/admin-edit - admin/bootcamp_admin only. Edit a student's info.
+router.put('/:id/admin-edit', requireAdminForStudentCreate, async (req, res) => {
+  const { full_name, phone, gender, age, category } = req.body;
+  const { rows } = await pool.query(
+    `UPDATE students SET full_name=COALESCE($1,full_name), phone=COALESCE($2,phone),
+     gender=COALESCE($3,gender), age=COALESCE($4,age), category=COALESCE($5,category)
+     WHERE id=$6 RETURNING id, full_name, email, phone, gender, age, category`,
+    [full_name || null, phone || null, gender || null, age || null, category || null, req.params.id]ግ
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Student not found' });
+  res.json(rows[0]);
+});
+
 module.exports = { router, requireStudent };
