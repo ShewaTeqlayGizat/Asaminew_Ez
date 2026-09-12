@@ -128,7 +128,7 @@ function requireAdminForStudentCreate(req, res, next) {
 }
 
 router.post('/admin-create', requireAdminForStudentCreate, upload.single('photo'), async (req, res) => {
-  const { full_name, email, password, phone, course_id } = req.body;
+  const { full_name, email, password, phone, course_id, gender, age, category } = req.body;
   if (!full_name || !email || !password) return res.status(400).json({ error: 'full_name, email, password required' });
   const { rows: existing } = await pool.query('SELECT id FROM students WHERE email = $1', [email]);
   if (existing.length) return res.status(409).json({ error: 'That email is already registered' });
@@ -138,8 +138,8 @@ router.post('/admin-create', requireAdminForStudentCreate, upload.single('photo'
   }
   const hash = await bcrypt.hash(password, 10);
   const { rows } = await pool.query(
-    'INSERT INTO students (full_name, email, password_hash, phone, photo_url) VALUES ($1,$2,$3,$4,$5) RETURNING id, full_name, email',
-    [full_name, email, hash, phone || null, photo_url]
+    'INSERT INTO students (full_name, email, password_hash, phone, photo_url, gender, age, category) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, full_name, email',
+    [full_name, email, hash, phone || null, photo_url, gender || null, age || null, category || null]
   );
   const student = rows[0];
   if (course_id) {
