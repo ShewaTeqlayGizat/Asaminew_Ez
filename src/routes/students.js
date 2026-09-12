@@ -154,7 +154,16 @@ router.post('/admin-create', requireAdminForStudentCreate, upload.single('photo'
 });
 
 // GET /api/courses/:id/roster - bootcamp admin/full admin only. Full student list with status for this course.
-router.get('/:id/roster', requireSuperAdmin, async (req, res) => {
+function requireBootcampOrAdmin(req, res, next) {
+  requireAdmin(req, res, () => {
+    if (req.admin.role !== 'admin' && req.admin.role !== 'bootcamp_admin') {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+    next();
+  });
+}
+
+router.get('/:id/roster', requireBootcampOrAdmin, async (req, res) => {
   const { rows } = await pool.query(
     `SELECT s.id, s.full_name, s.email, s.gender, s.age, s.category, s.photo_url,
             e.status, e.enrolled_at,
