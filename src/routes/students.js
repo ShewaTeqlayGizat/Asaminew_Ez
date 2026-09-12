@@ -128,7 +128,7 @@ function requireAdminForStudentCreate(req, res, next) {
 }
 
 router.post('/admin-create', requireAdminForStudentCreate, upload.single('photo'), async (req, res) => {
-  const { full_name, email, password, phone, course_id, gender, age, category } = req.body;
+  const { full_name, email, password, phone, course_id, gender, age, category, institution } = req.body;
   if (!full_name || !email || !password) return res.status(400).json({ error: 'full_name, email, password required' });
   const { rows: existing } = await pool.query('SELECT id FROM students WHERE email = $1', [email]);
   if (existing.length) return res.status(409).json({ error: 'That email is already registered' });
@@ -138,8 +138,8 @@ router.post('/admin-create', requireAdminForStudentCreate, upload.single('photo'
   }
   const hash = await bcrypt.hash(password, 10);
   const { rows } = await pool.query(
-    'INSERT INTO students (full_name, email, password_hash, phone, photo_url, gender, age, category) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, full_name, email',
-    [full_name, email, hash, phone || null, photo_url, gender || null, age || null, category || null]
+    'INSERT INTO students (full_name, email, password_hash, phone, photo_url, gender, age, category, institution) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, full_name, email',
+    [full_name, email, hash, phone || null, photo_url, gender || null, age || null, category || null, institution || null]
   );
   const student = rows[0];
   if (course_id) {
@@ -155,12 +155,12 @@ router.post('/admin-create', requireAdminForStudentCreate, upload.single('photo'
 
 // PUT /api/students/:id/admin-edit - admin/bootcamp_admin only. Edit a student's info.
 router.put('/:id/admin-edit', requireAdminForStudentCreate, async (req, res) => {
-  const { full_name, phone, gender, age, category } = req.body;
+  const { full_name, phone, gender, age, category, institution } = req.body;
   const { rows } = await pool.query(
     `UPDATE students SET full_name=COALESCE($1,full_name), phone=COALESCE($2,phone),
-     gender=COALESCE($3,gender), age=COALESCE($4,age), category=COALESCE($5,category)
-     WHERE id=$6 RETURNING id, full_name, email, phone, gender, age, category`,
-    [full_name || null, phone || null, gender || null, age || null, category || null, req.params.id]ግ
+     gender=COALESCE($3,gender), age=COALESCE($4,age), category=COALESCE($5,category), institution=COALESCE($6,institution)
+     WHERE id=$7 RETURNING id, full_name, email, phone, gender, age, category, institution`,
+    [full_name || null, phone || null, gender || null, age || null, category || null, institution || null, req.params.id]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Student not found' });
   res.json(rows[0]);
