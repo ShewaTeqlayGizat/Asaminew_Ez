@@ -79,8 +79,12 @@ router.put('/:id', requireSuperAdminOrOfficeForInternal, upload.single('file'), 
   }
 });
 
-// DELETE /api/content/:id - admin only
-router.delete('/:id', requireSuperAdmin, async (req, res) => {
+// DELETE /api/content/:id - admin only, or office_admin for internal-record types
+router.delete('/:id', requireAdmin, async (req, res) => {
+  const { rows } = await pool.query('SELECT type FROM content_items WHERE id=$1', [req.params.id]);
+  if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+  const isAllowed = req.admin.role === 'admin' || (req.admin.role === 'office_admin' && INTERNAL_TYPES.includes(rows[0].type));
+  if (!isAllowed) return res.status(403).json({ error: 'Not allowed' });
   await pool.query('DELETE FROM content_items WHERE id = $1', [req.params.id]);
   res.status(204).end();
 });
