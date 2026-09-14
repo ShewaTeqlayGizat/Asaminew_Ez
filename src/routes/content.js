@@ -1,92 +1,91 @@
 const express = require('express');
-const multer = require('multer');
-const pool = require('../db');
-const { requireSuperAdmin } = require('../middleware/auth');
-const { uploadFile } = require('../utils/storage');
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const pool = require('../db');
+const { requireAdmin } = require('../middleware/auth');
 
-const VALID_TYPES = [
-  'library', 'eduPdf', 'eduPpt', 'eduVideo', 'eduText',
-  'gazettePdf', 'gazetteText', 'entVideo', 'entCulture',
-  'channelVideo', 'liveBroadcast',
-  'financeReport', 'meetingMinutes', 'internalDoc', 'internalStats'
-];
-
-// GET /api/content?type=xxx - public
+// GET /api/content - Public access to fetch all content items
 router.get('/', async (req, res) => {
-  const { type } = req.query;
-  let rows;
-  if (type) {
-    ({ rows } = await pool.query('SELECT * FROM content_items WHERE type = $1 ORDER BY date DESC, id DESC', [type]));
-  } else {
-    ({ rows } = await pool.query('SELECT * FROM content_items ORDER BY date DESC, id DESC'));
+  try {
+    const { rows } = await pool.query('SELECT * FROM content ORDER BY created_at DESC');
+    res.json(rows);
+  } catch (err) {
+    console.error('Fetch content error:', err);
+    res.status(500).json({ error: 'Failed to fetch content' });
   }
-  res.json(rows);
 });
 
-// POST /api/content - admin only. Optional file upload ("file"), or a URL body field for videos.
-const INTERNAL_TYPES = ['financeReport', 'meetingMinutes', 'internalDoc', 'internalStats'];
-function requireSuperAdminOrOfficeForInternal(req, res, next) {
-  requireAdmin(req, res, () => {
-    if (req.admin.role === 'admin') return next();
-    if (req.admin.role === 'office_admin' && INTERNAL_TYPES.includes(req.body.type)) return next();
-    return res.status(403).json({ error: 'Not allowed' });
-  });
-}
-
-router.post('/', requireSuperAdminOrOfficeForInternal, upload.single('file'), async (req, res) => {
+// GET /api/content/:id - Public access to fetch a single content item
+router.get('/:id', async (req, res) => {
   try {
-    const { type, title, author, category, body, date, pages, url, topic_key } = req.body;
-    if (!type || !VALID_TYPES.includes(type)) return res.status(400).json({ error: 'valid type required' });
-    if (!title) return res.status(400).json({ error: 'title required' });
-    let file_url = url || null;
-    if (req.file) {
-      file_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'content');
+    const { rows } = await pool.query('SELECT * FROM content WHERE id = $1', [req.params.id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Content not found' });
     }
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Fetch single content error:', err);
+    res.status(500).json({ error: 'Failed to fetch content item' });
+  }
+});
+
+// POST /api/content - Admin only: Create content
+router.post('/', requireAdmin, async (req, res) => {
+  const { title, body, category, image_url } = req.body;
+  if (!title || !body) {
+    return res.status(400).json({ error: 'Title and body are required' });
+  }
+
+  try {
     const { rows } = await pool.query(
-      `INSERT INTO content_items (type, topic_key, title, author, category, body, file_url, pages, date)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9, CURRENT_DATE)) RETURNING *`,
-      [type, topic_key || null, title, author || null, category || null, body || null, file_url, pages || null, date || null]
+      `INSERT INTO content (title, body, category, image_url, created_by)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [title, body, category || null, image_url || null, req.admin?.username || 'admin']
     );
     res.status(201).json(rows[0]);
   } catch (err) {
-    console.error('Content post failed:', err);
-    res.status(500).json({ error: 'Upload failed: ' + err.message });
+    console.error('Create content error:', err);
+    res.status(500).json({ error: 'Failed to create content' });
   }
 });
 
-// PUT /api/content/:id - admin only
-router.put('/:id', requireSuperAdminOrOfficeForInternal, upload.single('file'), async (req, res) => {
+// PUT /api/content/:id - Admin only: Update content
+router.put('/:id', requireAdmin, async (req, res) => {
+  const { title, body, category, image_url } = req.body;
+
   try {
-    const { title, author, category, body, date, pages, url } = req.body;
-    let file_url = url || null;
-    if (req.file) {
-      file_url = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, 'content');
-    }
     const { rows } = await pool.query(
-      `UPDATE content_items SET title = COALESCE($1, title), author = COALESCE($2, author),
-       category = COALESCE($3, category), body = COALESCE($4, body),
-       file_url = COALESCE($5, file_url), pages = COALESCE($6, pages), date = COALESCE($7, date)
-       WHERE id = $8 RETURNING *`,
-      [title || null, author || null, category || null, body || null, file_url, pages || null, date || null, req.params.id]
+      `UPDATE content 
+       SET title = COALESCE($1, title),
+           body = COALESCE($2, body),
+           category = COALESCE($3, category),
+           image_url = COALESCE($4, image_url),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5 RETURNING *`,
+      [title, body, category, image_url, req.params.id]
     );
-    if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Content not found' });
+    }
     res.json(rows[0]);
   } catch (err) {
-    console.error('Content update failed:', err);
-    res.status(500).json({ error: 'Update failed: ' + err.message });
+    console.error('Update content error:', err);
+    res.status(500).json({ error: 'Failed to update content' });
   }
 });
 
-// DELETE /api/content/:id - admin only, or office_admin for internal-record types
+// DELETE /api/content/:id - Admin only: Delete content
 router.delete('/:id', requireAdmin, async (req, res) => {
-  const { rows } = await pool.query('SELECT type FROM content_items WHERE id=$1', [req.params.id]);
-  if (!rows[0]) return res.status(404).json({ error: 'Not found' });
-  const isAllowed = req.admin.role === 'admin' || (req.admin.role === 'office_admin' && INTERNAL_TYPES.includes(rows[0].type));
-  if (!isAllowed) return res.status(403).json({ error: 'Not allowed' });
-  await pool.query('DELETE FROM content_items WHERE id = $1', [req.params.id]);
-  res.status(204).end();
+  try {
+    const { rowCount } = await pool.query('DELETE FROM content WHERE id = $1', [req.params.id]);
+    if (rowCount === 0) {
+      return res.status(404).json({ error: 'Content not found' });
+    }
+    res.status(204).end();
+  } catch (err) {
+    console.error('Delete content error:', err);
+    res.status(500).json({ error: 'Failed to delete content' });
+  }
 });
 
 module.exports = router;
