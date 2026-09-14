@@ -57,7 +57,7 @@ router.post('/', requireSuperAdminOrOfficeForInternal, upload.single('file'), as
 });
 
 // PUT /api/content/:id - admin only
-router.put('/:id', requireSuperAdmin, upload.single('file'), async (req, res) => {
+router.put('/:id', requireSuperAdminOrOfficeForInternal, upload.single('file'), async (req, res) => {
   try {
     const { title, author, category, body, date, pages, url } = req.body;
     let file_url = url || null;
