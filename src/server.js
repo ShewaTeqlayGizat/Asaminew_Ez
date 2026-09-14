@@ -20,7 +20,6 @@ process.on('uncaughtException', (err) => {
 const app = express();
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '2mb' }));
-
 // Only allow requests from your GitHub Pages site (and localhost for dev).
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
   .split(',')
@@ -46,6 +45,7 @@ app.use('/api/students', require('./routes/students').router);
 app.use('/api/courses', require('./routes/courses'));
 app.use('/api/quizzes', require('./routes/quizzes'));
 app.use('/api/certificates', require('./routes/certificates'));
+app.use('/api/payees', require('./routes/payees').router);
 app.use('/api/payees', require('./routes/payees').router);
 app.use('/api/finance', require('./routes/finance'));
 
