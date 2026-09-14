@@ -26,7 +26,16 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/content - admin only. Optional file upload ("file"), or a URL body field for videos.
-router.post('/', requireSuperAdmin, upload.single('file'), async (req, res) => {
+const INTERNAL_TYPES = ['financeReport', 'meetingMinutes', 'internalDoc', 'internalStats'];
+function requireSuperAdminOrOfficeForInternal(req, res, next) {
+  requireAdmin(req, res, () => {
+    if (req.admin.role === 'admin') return next();
+    if (req.admin.role === 'office_admin' && INTERNAL_TYPES.includes(req.body.type)) return next();
+    return res.status(403).json({ error: 'Not allowed' });
+  });
+}
+
+router.post('/', requireSuperAdminOrOfficeForInternal, upload.single('file'), async (req, res) => {
   try {
     const { type, title, author, category, body, date, pages, url, topic_key } = req.body;
     if (!type || !VALID_TYPES.includes(type)) return res.status(400).json({ error: 'valid type required' });
