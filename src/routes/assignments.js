@@ -91,14 +91,28 @@ router.post('/:id/report', requireExecutive, uploadPhotos, async (req, res) => {
   }
 });
 
+const jwt = require('jsonwebtoken');
+
 // GET /api/assignments/:id/report - office admin OR the owning executive. View a report with attachments.
-router.get('/:id/report', async (req, res, next) => {
-  // Allow either an office admin token or an executive token; try office admin first.
-  requireOfficeAdmin(req, res, async (err) => {
-    // requireOfficeAdmin calls next() on success internally via middleware chain, but since we
-    // called it directly, on success it already sent nothing and just proceeds — so handle inline:
-  });
-}, async (req, res) => {
+router.get('/:id/report', async (req, res) => {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Missing auth token' });
+
+  let payload;
+  try {
+    payload = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const { rows: assignRows } = await pool.query('SELECT * FROM assignments WHERE id=$1', [req.params.id]);
+  if (!assignRows[0]) return res.status(404).json({ error: 'Assignment not found' });
+
+  const isOfficeAdmin = payload.role === 'admin' || payload.role === 'office_admin';
+  const isOwningExecutive = payload.kind === 'executive' && payload.id === assignRows[0].executive_id;
+  if (!isOfficeAdmin && !isOwningExecutive) return res.status(403).json({ error: 'Not allowed' });
+
   const { rows: reportRows } = await pool.query('SELECT * FROM assignment_reports WHERE assignment_id=$1', [req.params.id]);
   if (!reportRows[0]) return res.status(404).json({ error: 'No report yet' });
   const { rows: attachments } = await pool.query('SELECT * FROM report_attachments WHERE report_id=$1', [reportRows[0].id]);
