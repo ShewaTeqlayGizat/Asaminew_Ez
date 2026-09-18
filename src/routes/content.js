@@ -6,7 +6,7 @@ const { requireAdmin } = require('../middleware/auth');
 // GET /api/content - Public access to fetch all content items
 router.get('/', async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM content ORDER BY created_at DESC');
+    const { rows } = await pool.query('SELECT * FROM content_items ORDER BY created_at DESC');
     res.json(rows);
   } catch (err) {
     console.error('Fetch content error:', err);
@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
 // GET /api/content/:id - Public access to fetch a single content item
 router.get('/:id', async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM content WHERE id = $1', [req.params.id]);
+    const { rows } = await pool.query('SELECT * FROM content_items WHERE id = $1', [req.params.id]);
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Content not found' });
     }
@@ -37,7 +37,7 @@ router.post('/', requireAdmin, async (req, res) => {
 
   try {
     const { rows } = await pool.query(
-      `INSERT INTO content (title, body, category, image_url, created_by)
+      `INSERT INTO content_items (title, body, category, image_url, created_by)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [title, body, category || null, image_url || null, req.admin?.username || 'admin']
     );
@@ -54,7 +54,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
 
   try {
     const { rows } = await pool.query(
-      `UPDATE content 
+      `UPDATE content_items 
        SET title = COALESCE($1, title),
            body = COALESCE($2, body),
            category = COALESCE($3, category),
@@ -77,7 +77,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
 // DELETE /api/content/:id - Admin only: Delete content
 router.delete('/:id', requireAdmin, async (req, res) => {
   try {
-    const { rowCount } = await pool.query('DELETE FROM content WHERE id = $1', [req.params.id]);
+    const { rowCount } = await pool.query('DELETE FROM content_items WHERE id = $1', [req.params.id]);
     if (rowCount === 0) {
       return res.status(404).json({ error: 'Content not found' });
     }
