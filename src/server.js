@@ -46,7 +46,6 @@ app.use('/api/courses', require('./routes/courses'));
 app.use('/api/quizzes', require('./routes/quizzes'));
 app.use('/api/certificates', require('./routes/certificates'));
 app.use('/api/payees', require('./routes/payees').router);
-app.use('/api/payees', require('./routes/payees').router);
 app.use('/api/finance', require('./routes/finance'));
 app.use('/api/meetings', require('./routes/meetings'));
 app.use('/api/executives', require('./routes/executives').router);
