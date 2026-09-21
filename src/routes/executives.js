@@ -14,7 +14,7 @@ const loginLimiter = rateLimit({
 
 function requireOfficeAdmin(req, res, next) {
   requireAdmin(req, res, () => {
-    if (req.admin.role !== 'admin' && req.admin.role !== 'office_admin') {
+    if (!['admin', 'moderator', 'office_admin'].includes(req.admin.role)) {
       return res.status(403).json({ error: 'Office admin access required' });
     }
     next();

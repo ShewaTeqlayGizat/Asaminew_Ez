@@ -109,7 +109,7 @@ router.get('/:id/report', async (req, res) => {
   const { rows: assignRows } = await pool.query('SELECT * FROM assignments WHERE id=$1', [req.params.id]);
   if (!assignRows[0]) return res.status(404).json({ error: 'Assignment not found' });
 
-  const isOfficeAdmin = payload.role === 'admin' || payload.role === 'office_admin';
+  const isOfficeAdmin = ['admin', 'moderator', 'office_admin'].includes(payload.role);
   const isOwningExecutive = payload.kind === 'executive' && payload.id === assignRows[0].executive_id;
   if (!isOfficeAdmin && !isOwningExecutive) return res.status(403).json({ error: 'Not allowed' });
 
