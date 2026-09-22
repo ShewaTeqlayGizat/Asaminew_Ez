@@ -15,8 +15,8 @@ function requireAdminOrModerator(req, res, next) {
   });
 }
 
-// GET /api/comments - admin + moderator only now (was public).
-router.get('/', requireAdminOrModerator, async (req, res) => {
+// GET /api/comments - public again, so visitors can see comments.
+router.get('/', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM comments ORDER BY date DESC, id DESC');
   res.json(rows);
 });
