@@ -4,6 +4,25 @@ const pool = require('../db');
 const { requireExecutive, requireOfficeAdmin } = require('./executives');
 const { uploadFile } = require('../utils/storage');
 const router = express.Router();
+
+// One-time, idempotent migration: adds protocol_number + signature_name to
+// assignment_reports if they don't exist yet, and backfills any existing
+// reports that lack a protocol number. Runs once when this module loads.
+(async () => {
+  try {
+    await pool.query(`ALTER TABLE assignment_reports ADD COLUMN IF NOT EXISTS protocol_number TEXT`);
+    await pool.query(`ALTER TABLE assignment_reports ADD COLUMN IF NOT EXISTS signature_name TEXT`);
+    const { rows } = await pool.query(`SELECT id, submitted_at FROM assignment_reports WHERE protocol_number IS NULL`);
+    for (const r of rows) {
+      const year = new Date(r.submitted_at || Date.now()).getFullYear();
+      const protocol = `ስቅ-${year}-${String(r.id).padStart(6, '0')}`;
+      await pool.query(`UPDATE assignment_reports SET protocol_number = $1 WHERE id = $2`, [protocol, r.id]);
+    }
+    if (rows.length) console.log(`assignment_reports: backfilled ${rows.length} protocol number(s).`);
+  } catch (err) {
+    console.error('assignment_reports migration failed (non-fatal):', err.message);
+  }
+})();
 const uploadPhotos = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }).array('photos', 10);
 
 // ---- Assignments ----
@@ -53,7 +72,11 @@ router.delete('/:id', requireOfficeAdmin, async (req, res) => {
 router.post('/:id/report', requireExecutive, uploadPhotos, async (req, res) => {
   const { achievements, unaccomplished, challenges, solutions_taken,
           swot_strengths, swot_weaknesses, swot_opportunities, swot_threats,
-          future_recommendations, findings } = req.body;
+          future_recommendations, findings, signature_name } = req.body;
+
+  if (!signature_name || !signature_name.trim()) {
+    return res.status(400).json({ error: 'Signature (full name) is required to submit a report' });
+  }
 
   const { rows: assignRows } = await pool.query('SELECT * FROM assignments WHERE id=$1 AND executive_id=$2', [req.params.id, req.executive.id]);
   if (!assignRows[0]) return res.status(404).json({ error: 'Assignment not found' });
@@ -64,13 +87,23 @@ router.post('/:id/report', requireExecutive, uploadPhotos, async (req, res) => {
     const { rows } = await client.query(
       `INSERT INTO assignment_reports
          (assignment_id, executive_id, achievements, unaccomplished, challenges, solutions_taken,
-          swot_strengths, swot_weaknesses, swot_opportunities, swot_threats, future_recommendations, findings)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+          swot_strengths, swot_weaknesses, swot_opportunities, swot_threats, future_recommendations, findings,
+          signature_name)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
       [req.params.id, req.executive.id, achievements || null, unaccomplished || null, challenges || null, solutions_taken || null,
        swot_strengths || null, swot_weaknesses || null, swot_opportunities || null, swot_threats || null,
-       future_recommendations || null, findings || null]
+       future_recommendations || null, findings || null, signature_name.trim()]
     );
-    const report = rows[0];
+    let report = rows[0];
+
+    // Assign the protocol number now that we have the row's id.
+    const year = new Date(report.submitted_at || Date.now()).getFullYear();
+    const protocol_number = `ስቅ-${year}-${String(report.id).padStart(6, '0')}`;
+    const { rows: updated } = await client.query(
+      `UPDATE assignment_reports SET protocol_number = $1 WHERE id = $2 RETURNING *`,
+      [protocol_number, report.id]
+    );
+    report = updated[0];
 
     if (req.files && req.files.length) {
       for (const file of req.files) {
