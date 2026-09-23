@@ -12,6 +12,8 @@ const router = express.Router();
   try {
     await pool.query(`ALTER TABLE assignment_reports ADD COLUMN IF NOT EXISTS protocol_number TEXT`);
     await pool.query(`ALTER TABLE assignment_reports ADD COLUMN IF NOT EXISTS signature_name TEXT`);
+    await pool.query(`ALTER TABLE assignment_reports ADD COLUMN IF NOT EXISTS supervisor_name TEXT`);
+    await pool.query(`ALTER TABLE assignment_reports ADD COLUMN IF NOT EXISTS supervisor_signature_url TEXT`);
     const { rows } = await pool.query(`SELECT id, submitted_at FROM assignment_reports WHERE protocol_number IS NULL`);
     for (const r of rows) {
       const year = new Date(r.submitted_at || Date.now()).getFullYear();
@@ -23,7 +25,10 @@ const router = express.Router();
     console.error('assignment_reports migration failed (non-fatal):', err.message);
   }
 })();
-const uploadPhotos = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }).array('photos', 10);
+const uploadPhotos = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }).fields([
+  { name: 'photos', maxCount: 10 },
+  { name: 'supervisor_signature', maxCount: 1 },
+]);
 
 // ---- Assignments ----
 
@@ -72,7 +77,7 @@ router.delete('/:id', requireOfficeAdmin, async (req, res) => {
 router.post('/:id/report', requireExecutive, uploadPhotos, async (req, res) => {
   const { achievements, unaccomplished, challenges, solutions_taken,
           swot_strengths, swot_weaknesses, swot_opportunities, swot_threats,
-          future_recommendations, findings, signature_name } = req.body;
+          future_recommendations, findings, signature_name, supervisor_name } = req.body;
 
   if (!signature_name || !signature_name.trim()) {
     return res.status(400).json({ error: 'Signature (full name) is required to submit a report' });
@@ -84,15 +89,22 @@ router.post('/:id/report', requireExecutive, uploadPhotos, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    let supervisor_signature_url = null;
+    if (req.files && req.files.supervisor_signature && req.files.supervisor_signature[0]) {
+      const f = req.files.supervisor_signature[0];
+      supervisor_signature_url = await uploadFile(f.buffer, f.originalname, f.mimetype, 'reports');
+    }
+
     const { rows } = await client.query(
       `INSERT INTO assignment_reports
          (assignment_id, executive_id, achievements, unaccomplished, challenges, solutions_taken,
           swot_strengths, swot_weaknesses, swot_opportunities, swot_threats, future_recommendations, findings,
-          signature_name)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+          signature_name, supervisor_name, supervisor_signature_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
       [req.params.id, req.executive.id, achievements || null, unaccomplished || null, challenges || null, solutions_taken || null,
        swot_strengths || null, swot_weaknesses || null, swot_opportunities || null, swot_threats || null,
-       future_recommendations || null, findings || null, signature_name.trim()]
+       future_recommendations || null, findings || null, signature_name.trim(),
+       (supervisor_name || '').trim() || null, supervisor_signature_url]
     );
     let report = rows[0];
 
@@ -105,8 +117,9 @@ router.post('/:id/report', requireExecutive, uploadPhotos, async (req, res) => {
     );
     report = updated[0];
 
-    if (req.files && req.files.length) {
-      for (const file of req.files) {
+    const photoFiles = (req.files && req.files.photos) || [];
+    if (photoFiles.length) {
+      for (const file of photoFiles) {
         const file_url = await uploadFile(file.buffer, file.originalname, file.mimetype, 'reports');
         await client.query('INSERT INTO report_attachments (report_id, file_url) VALUES ($1,$2)', [report.id, file_url]);
       }
