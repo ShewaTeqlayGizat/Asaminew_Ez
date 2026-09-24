@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
 const { simpleCrudRouter } = require('./utils/simpleCrud');
 
@@ -19,6 +20,7 @@ process.on('uncaughtException', (err) => {
 
 const app = express();
 app.set('trust proxy', 1);
+app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(express.json({ limit: '2mb' }));
 // Only allow requests from your GitHub Pages site (and localhost for dev).
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
