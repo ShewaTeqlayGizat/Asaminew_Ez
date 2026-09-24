@@ -1,6 +1,6 @@
 const express = require('express');
 const pool = require('../db');
-const { requireAdmin } = require('../middleware/auth');
+const { requireSuperAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -9,7 +9,7 @@ router.get('/', async (req, res) => {
   res.json(rows);
 });
 
-router.post('/', requireAdmin, async (req, res) => {
+router.post('/', requireSuperAdmin, async (req, res) => {
   const { title, date, duration, audience } = req.body;
   if (!title || !date) return res.status(400).json({ error: 'title and date required' });
   const { rows } = await pool.query(
@@ -19,7 +19,7 @@ router.post('/', requireAdmin, async (req, res) => {
   res.status(201).json(rows[0]);
 });
 
-router.put('/:id', requireAdmin, async (req, res) => {
+router.put('/:id', requireSuperAdmin, async (req, res) => {
   const { title, date, duration, audience } = req.body;
   const { rows } = await pool.query(
     `UPDATE training SET title = COALESCE($1, title), date = COALESCE($2, date),
@@ -31,7 +31,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
   res.json(rows[0]);
 });
 
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireSuperAdmin, async (req, res) => {
   await pool.query('DELETE FROM training WHERE id = $1', [req.params.id]);
   res.status(204).end();
 });

@@ -45,7 +45,7 @@ router.post('/', commentLimiter, async (req, res) => {
 });
 
 // DELETE /api/comments/:id - full admin only (moderators can read but not delete now).
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireAdminOrModerator, async (req, res) => {
   if (req.admin.role !== 'admin') {
     return res.status(403).json({ error: 'Full admin access required to delete comments' });
   }

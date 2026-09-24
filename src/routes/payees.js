@@ -83,7 +83,7 @@ router.post('/login', loginLimiter, async (req, res) => {
   }
 
   await pool.query('UPDATE payees SET failed_attempts=0, locked_until=NULL WHERE id=$1', [payee.id]);
-  const token = jwt.sign({ id: payee.id, full_name: payee.full_name, kind: 'payee' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+  const token = jwt.sign({ id: payee.id, full_name: payee.full_name, kind: 'payee' }, process.env.JWT_SECRET, { expiresIn: '12h' });
   res.json({ token, payee: { id: payee.id, full_name: payee.full_name, payee_type: payee.payee_type } });
 });
 

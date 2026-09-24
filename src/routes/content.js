@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const pool = require('../db');
-const { requireAdmin } = require('../middleware/auth');
+const { requireSuperAdmin } = require('../middleware/auth');
 const { uploadFile } = require('../utils/storage');
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
@@ -39,7 +39,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/content - admin (any type) or moderator (internal-record types only)
-router.post('/', requireAdmin, upload.single('file'), async (req, res) => {
+router.post('/', requireSuperAdmin, upload.single('file'), async (req, res) => {
   try {
     const { type, title, author, category, body, date, pages, url, topic_key } = req.body;
     if (!type || !VALID_TYPES.includes(type)) return res.status(400).json({ error: 'valid type required' });
@@ -62,7 +62,7 @@ router.post('/', requireAdmin, upload.single('file'), async (req, res) => {
 });
 
 // PUT /api/content/:id - same permission rule, based on the stored type
-router.put('/:id', requireAdmin, upload.single('file'), async (req, res) => {
+router.put('/:id', requireSuperAdmin, upload.single('file'), async (req, res) => {
   try {
     const { rows: found } = await pool.query('SELECT type FROM content_items WHERE id = $1', [req.params.id]);
     if (!found[0]) return res.status(404).json({ error: 'Not found' });
@@ -88,7 +88,7 @@ router.put('/:id', requireAdmin, upload.single('file'), async (req, res) => {
 });
 
 // DELETE /api/content/:id - same permission rule
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireSuperAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT type FROM content_items WHERE id = $1', [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Not found' });

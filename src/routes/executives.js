@@ -80,7 +80,7 @@ router.post('/login', loginLimiter, async (req, res) => {
   }
 
   await pool.query('UPDATE executives SET failed_attempts=0, locked_until=NULL WHERE id=$1', [exec.id]);
-  const token = jwt.sign({ id: exec.id, full_name: exec.full_name, kind: 'executive' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+  const token = jwt.sign({ id: exec.id, full_name: exec.full_name, kind: 'executive' }, process.env.JWT_SECRET, { expiresIn: '12h' });
   res.json({ token, executive: { id: exec.id, full_name: exec.full_name, position: exec.position } });
 });
 

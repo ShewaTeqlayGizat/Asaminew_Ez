@@ -13,7 +13,10 @@ function requireAdmin(req, res, next) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.admin = payload; // { id, username, role }
+    if (payload.kind || !payload.role) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    req.admin = payload;
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token' });

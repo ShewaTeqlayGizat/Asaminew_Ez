@@ -45,7 +45,7 @@ router.post('/signup', upload.single('photo'), async (req, res) => {
     'INSERT INTO students (full_name, email, password_hash, phone, photo_url) VALUES ($1,$2,$3,$4,$5) RETURNING id, full_name, email, photo_url',
     [full_name, email, hash, phone || null, photo_url]
   );
-  const token = jwt.sign({ id: rows[0].id, email, kind: 'student' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+  const token = jwt.sign({ id: rows[0].id, email, kind: 'student' }, process.env.JWT_SECRET, { expiresIn: '7d' });
   res.status(201).json({ token, student: rows[0] });
 });
 
@@ -74,7 +74,7 @@ router.post('/login', loginLimiter, async (req, res) => {
   }
 
   await pool.query('UPDATE students SET failed_attempts=0, locked_until=NULL WHERE id=$1', [student.id]);
-    const token = jwt.sign({ id: student.id, email: student.email, kind: 'student' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ id: student.id, email: student.email, kind: 'student' }, process.env.JWT_SECRET, { expiresIn: '7d' });
   res.json({ token, student: { id: student.id, full_name: student.full_name, email: student.email, photo_url: student.photo_url } });
 });
 

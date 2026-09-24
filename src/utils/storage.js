@@ -12,6 +12,11 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+const ALLOWED = {
+  "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif",
+  "application/pdf": "pdf", "video/mp4": "mp4", "video/webm": "webm",
+};
+
 const BUCKET = process.env.SUPABASE_BUCKET || 'uploads';
 
 /**
@@ -22,7 +27,8 @@ const BUCKET = process.env.SUPABASE_BUCKET || 'uploads';
  * @param {string} folder - subfolder, e.g. 'info-board', 'gallery'
  */
 async function uploadFile(buffer, originalName, mimeType, folder = 'misc') {
-  const ext = originalName.includes('.') ? originalName.split('.').pop() : 'bin';
+  const ext = ALLOWED[mimeType];
+  if (!ext) throw new Error("File type not allowed");
   const key = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const { error } = await supabase.storage.from(BUCKET).upload(key, buffer, {
