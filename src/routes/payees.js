@@ -58,6 +58,24 @@ router.get('/', requireFinanceAdmin, async (req, res) => {
   res.json(rows);
 });
 
+// PUT /api/payees/:id - finance admin only. Edit a payee's info.
+router.put('/:id', requireFinanceAdmin, async (req, res) => {
+  const { full_name, payee_type, phone, email, bank_account } = req.body;
+  if (!full_name || !payee_type) return res.status(400).json({ error: 'full_name and payee_type required' });
+  const { rows } = await pool.query(
+    'UPDATE payees SET full_name=$1, payee_type=$2, phone=$3, email=$4, bank_account=$5 WHERE id=$6 RETURNING id, full_name, payee_type, phone, email, bank_account',
+    [full_name, payee_type, phone || null, email || null, bank_account || null, req.params.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Payee not found' });
+  res.json(rows[0]);
+});
+
+// DELETE /api/payees/:id - finance admin only.
+router.delete('/:id', requireFinanceAdmin, async (req, res) => {
+  await pool.query('DELETE FROM payees WHERE id=$1', [req.params.id]);
+  res.status(204).end();
+});
+
 // POST /api/payees/login - by full_name + password
 router.post('/login', loginLimiter, async (req, res) => {
   const { full_name, password } = req.body;

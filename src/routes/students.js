@@ -167,4 +167,10 @@ router.put('/:id/admin-edit', requireAdminForStudentCreate, async (req, res) => 
   res.json(rows[0]);
 });
 
+// DELETE /api/students/:id - admin/bootcamp_admin only.
+router.delete('/:id', requireAdminForStudentCreate, async (req, res) => {
+  await pool.query('DELETE FROM students WHERE id=$1', [req.params.id]);
+  res.status(204).end();
+});
+
 module.exports = { router, requireStudent };

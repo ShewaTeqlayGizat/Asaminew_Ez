@@ -55,6 +55,24 @@ router.get('/', requireOfficeAdmin, async (req, res) => {
   res.json(rows);
 });
 
+// PUT /api/executives/:id - office admin only. Edit an executive's info.
+router.put('/:id', requireOfficeAdmin, async (req, res) => {
+  const { full_name, position, phone, email } = req.body;
+  if (!full_name) return res.status(400).json({ error: 'full_name required' });
+  const { rows } = await pool.query(
+    'UPDATE executives SET full_name=$1, position=$2, phone=$3, email=$4 WHERE id=$5 RETURNING id, full_name, position, phone, email',
+    [full_name, position || null, phone || null, email || null, req.params.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Executive not found' });
+  res.json(rows[0]);
+});
+
+// DELETE /api/executives/:id - office admin only.
+router.delete('/:id', requireOfficeAdmin, async (req, res) => {
+  await pool.query('DELETE FROM executives WHERE id=$1', [req.params.id]);
+  res.status(204).end();
+});
+
 // POST /api/executives/login - by full_name + password
 router.post('/login', loginLimiter, async (req, res) => {
   const { full_name, password } = req.body;

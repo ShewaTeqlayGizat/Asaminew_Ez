@@ -60,6 +60,18 @@ router.get('/my', requireExecutive, async (req, res) => {
   res.json(rows);
 });
 
+// PUT /api/assignments/:id - office admin only. Edit an assignment.
+router.put('/:id', requireOfficeAdmin, async (req, res) => {
+  const { executive_id, title, description, deadline } = req.body;
+  if (!executive_id || !title) return res.status(400).json({ error: 'executive_id and title required' });
+  const { rows } = await pool.query(
+    'UPDATE assignments SET executive_id=$1, title=$2, description=$3, deadline=$4 WHERE id=$5 RETURNING *',
+    [executive_id, title, description || null, deadline || null, req.params.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Assignment not found' });
+  res.json(rows[0]);
+});
+
 // DELETE /api/assignments/:id - office admin only.
 router.delete('/:id', requireOfficeAdmin, async (req, res) => {
   await pool.query('DELETE FROM assignments WHERE id=$1', [req.params.id]);

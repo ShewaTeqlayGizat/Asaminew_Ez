@@ -46,6 +46,15 @@ router.post('/', requireSuperAdmin, async (req, res) => {
   res.status(201).json(rows[0]);
 });
 
+// PUT /api/quizzes/:id - full admin only. Edit the quiz title.
+router.put('/:id', requireSuperAdmin, async (req, res) => {
+  const { title } = req.body;
+  if (!title) return res.status(400).json({ error: 'title required' });
+  const { rows } = await pool.query('UPDATE quizzes SET title=$1 WHERE id=$2 RETURNING *', [title, req.params.id]);
+  if (!rows[0]) return res.status(404).json({ error: 'Quiz not found' });
+  res.json(rows[0]);
+});
+
 // DELETE /api/quizzes/:id - full admin only
 router.delete('/:id', requireSuperAdmin, async (req, res) => {
   await pool.query('DELETE FROM quizzes WHERE id=$1', [req.params.id]);
@@ -62,6 +71,19 @@ router.post('/:id/questions', requireSuperAdmin, async (req, res) => {
     [req.params.id, question, option_a || null, option_b || null, option_c || null, option_d || null, correct_option.toUpperCase()]
   );
   res.status(201).json(rows[0]);
+});
+
+// PUT /api/quizzes/questions/:qId - full admin only. Edit a question.
+router.put('/questions/:qId', requireSuperAdmin, async (req, res) => {
+  const { question, option_a, option_b, option_c, option_d, correct_option } = req.body;
+  if (!question || !correct_option) return res.status(400).json({ error: 'question and correct_option required' });
+  const { rows } = await pool.query(
+    `UPDATE quiz_questions SET question=$1, option_a=$2, option_b=$3, option_c=$4, option_d=$5, correct_option=$6
+     WHERE id=$7 RETURNING *`,
+    [question, option_a || null, option_b || null, option_c || null, option_d || null, correct_option.toUpperCase(), req.params.qId]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Question not found' });
+  res.json(rows[0]);
 });
 
 // DELETE /api/quizzes/questions/:qId - full admin only
