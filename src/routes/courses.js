@@ -184,9 +184,11 @@ router.get('/:id/roster', requireBootcampOrAdmin, async (req, res) => {
     `SELECT s.id, s.full_name, s.email, s.gender, s.age, s.category, s.institution, s.photo_url,
             e.status, e.result, e.enrolled_at,
             (SELECT COUNT(*) FROM lessons l WHERE l.course_id = $1) as total_lessons,
-            (SELECT COUNT(*) FROM lesson_progress lp JOIN lessons l ON l.id = lp.lesson_id WHERE l.course_id = $1 AND lp.student_id = s.id) as completed_lessons
+            (SELECT COUNT(*) FROM lesson_progress lp JOIN lessons l ON l.id = lp.lesson_id WHERE l.course_id = $1 AND lp.student_id = s.id) as completed_lessons,
+            cert.certificate_code, cert.issued_at as certificate_issued_at
      FROM students s
      JOIN enrollments e ON e.student_id = s.id
+     LEFT JOIN certificates cert ON cert.student_id = s.id AND cert.course_id = $1
      WHERE e.course_id = $1
      ORDER BY s.full_name ASC`,
     [req.params.id]
