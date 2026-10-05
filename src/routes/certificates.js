@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const pool = require('../db');
 const { requireSuperAdmin } = require('../middleware/auth');
 const { requireStudent } = require('./students');
+const { requireCourseAccess } = require('./instructors');
 const router = express.Router();
 
 // GET /api/certificates/my - student's own certificates
@@ -31,7 +32,7 @@ router.get('/verify/:code', async (req, res) => {
 });
 
 // POST /api/certificates/issue - full admin only
-router.post('/issue', requireSuperAdmin, async (req, res) => {
+router.post('/issue', requireCourseAccess(req => req.body.course_id), async (req, res) => {
   const { student_id, course_id } = req.body;
   if (!student_id || !course_id) return res.status(400).json({ error: 'student_id and course_id required' });
   const code = crypto.randomBytes(6).toString('hex').toUpperCase();
@@ -47,7 +48,7 @@ router.post('/issue', requireSuperAdmin, async (req, res) => {
 });
 
 // GET /api/certificates/eligible-students?course_id=X - full admin only
-router.get('/eligible-students', requireSuperAdmin, async (req, res) => {
+router.get('/eligible-students', requireCourseAccess(req => req.query.course_id), async (req, res) => {
   const { course_id } = req.query;
   if (!course_id) return res.status(400).json({ error: 'course_id required' });
   const { rows } = await pool.query(
