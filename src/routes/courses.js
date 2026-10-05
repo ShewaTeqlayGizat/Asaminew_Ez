@@ -4,6 +4,7 @@ const multer = require('multer');
 const pool = require('../db');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { requireStudent } = require('./students');
+const { requireCourseAccess } = require('./instructors');
 const { uploadFile } = require('../utils/storage');
 const router = express.Router();
 
@@ -47,7 +48,7 @@ router.get('/:id', async (req, res) => {
 
 // POST /api/courses - full admin only
 router.post('/', requireSuperAdmin, uploadCourseFiles, async (req, res) => {
-  const { title, description, instructor, cover_url, signature2_name } = req.body;
+  const { title, description, instructor, cover_url, signature2_name, instructor_id } = req.body;
   if (!title) return res.status(400).json({ error: 'title required' });
   let logo_url = null, stamp_url = null, signature_url = null, signature2_url = null;
   if (req.files?.logo?.[0]) {
@@ -67,19 +68,20 @@ router.post('/', requireSuperAdmin, uploadCourseFiles, async (req, res) => {
     signature2_url = await uploadFile(f.buffer, f.originalname, f.mimetype, 'courses');
   }
   const { rows } = await pool.query(
-    'INSERT INTO courses (title, description, instructor, cover_url, logo_url, stamp_url, signature_url, signature2_name, signature2_url) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
-    [title, description || null, instructor || null, cover_url || null, logo_url, stamp_url, signature_url, signature2_name || null, signature2_url]
+    'INSERT INTO courses (title, description, instructor, cover_url, logo_url, stamp_url, signature_url, signature2_name, signature2_url, instructor_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *',
+    [title, description || null, instructor || null, cover_url || null, logo_url, stamp_url, signature_url, signature2_name || null, signature2_url, instructor_id || null]
   );
   res.status(201).json(rows[0]);
 });
 
 // PUT /api/courses/:id - full admin only
 router.put('/:id', requireSuperAdmin, async (req, res) => {
-  const { title, description, instructor, cover_url } = req.body;
+  const { title, description, instructor, cover_url, instructor_id } = req.body;
   const { rows } = await pool.query(
     `UPDATE courses SET title=COALESCE($1,title), description=COALESCE($2,description),
-     instructor=COALESCE($3,instructor), cover_url=COALESCE($4,cover_url) WHERE id=$5 RETURNING *`,
-    [title || null, description || null, instructor || null, cover_url || null, req.params.id]
+     instructor=COALESCE($3,instructor), cover_url=COALESCE($4,cover_url),
+     instructor_id=COALESCE($5,instructor_id) WHERE id=$6 RETURNING *`,
+    [title || null, description || null, instructor || null, cover_url || null, instructor_id || null, req.params.id]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Not found' });
   res.json(rows[0]);
@@ -95,7 +97,7 @@ router.delete('/:id', requireSuperAdmin, async (req, res) => {
 
 const uploadLessonFile = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } }).single('file');
 
-router.post('/:id/lessons', requireSuperAdmin, uploadLessonFile, async (req, res) => {
+router.post('/:id/lessons', requireCourseAccess(req => req.params.id), uploadLessonFile, async (req, res) => {
   const { title, video_url, position, lesson_type } = req.body;
   if (!title) return res.status(400).json({ error: 'title required' });
   const type = lesson_type || 'video_url';
@@ -113,7 +115,10 @@ router.post('/:id/lessons', requireSuperAdmin, uploadLessonFile, async (req, res
   res.status(201).json(rows[0]);
 });
 
-router.put('/lessons/:lessonId', requireSuperAdmin, uploadLessonFile, async (req, res) => {
+router.put('/lessons/:lessonId', requireCourseAccess(async req => {
+  const { rows } = await pool.query('SELECT course_id FROM lessons WHERE id=$1', [req.params.lessonId]);
+  return rows[0] && rows[0].course_id;
+}), uploadLessonFile, async (req, res) => {
   const { title, video_url, position, lesson_type } = req.body;
   let file_url = null;
   if (req.file) {
@@ -128,7 +133,10 @@ router.put('/lessons/:lessonId', requireSuperAdmin, uploadLessonFile, async (req
   res.json(rows[0]);
 });
 
-router.delete('/lessons/:lessonId', requireSuperAdmin, async (req, res) => {
+router.delete('/lessons/:lessonId', requireCourseAccess(async req => {
+  const { rows } = await pool.query('SELECT course_id FROM lessons WHERE id=$1', [req.params.lessonId]);
+  return rows[0] && rows[0].course_id;
+}), async (req, res) => {
   await pool.query('DELETE FROM lessons WHERE id=$1', [req.params.lessonId]);
   res.status(204).end();
 });
@@ -179,7 +187,7 @@ function requireBootcampOrAdmin(req, res, next) {
 }
 
 // GET /api/courses/:id/roster - bootcamp admin/full admin only. Full student list with status for this course.
-router.get('/:id/roster', requireBootcampOrAdmin, async (req, res) => {
+router.get('/:id/roster', requireCourseAccess(req => req.params.id), async (req, res) => {
   const { rows } = await pool.query(
     `SELECT s.id, s.full_name, s.email, s.gender, s.age, s.category, s.institution, s.photo_url,
             e.status, e.result, e.enrolled_at,
@@ -197,7 +205,7 @@ router.get('/:id/roster', requireBootcampOrAdmin, async (req, res) => {
 });
 
 // PUT /api/courses/:id/roster/:studentId - bootcamp admin/full admin only. Update a student's status for this course.
-router.put('/:id/roster/:studentId', requireBootcampOrAdmin, async (req, res) => {
+router.put('/:id/roster/:studentId', requireCourseAccess(req => req.params.id), async (req, res) => {
   const { status, result } = req.body;
   const validStatuses = ['active', 'completed', 'repeating', 'dropped', 'suspended'];
   const validResults = ['passed', 'failed', 'repeat', null, ''];

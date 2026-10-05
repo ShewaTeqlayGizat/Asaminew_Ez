@@ -45,6 +45,7 @@ app.use('/api/info-board', require('./routes/infoBoard'));
 app.use('/api/news', require('./routes/news'));
 app.use('/api/students', require('./routes/students').router);
 app.use('/api/courses', require('./routes/courses'));
+app.use('/api/instructors', require('./routes/instructors').router);
 app.use('/api/quizzes', require('./routes/quizzes'));
 app.use('/api/certificates', require('./routes/certificates'));
 app.use('/api/payees', require('./routes/payees').router);
