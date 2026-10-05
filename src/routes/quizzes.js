@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../db');
 const { requireSuperAdmin } = require('../middleware/auth');
 const { requireStudent } = require('./students');
+const { requireCourseAccess } = require('./instructors');
 const router = express.Router();
 
 // GET /api/quizzes?course_id=X - list quizzes for a course (public/student)
@@ -31,7 +32,10 @@ router.get('/:id', requireStudent, async (req, res) => {
 });
 
 // GET /api/quizzes/:id/admin - full admin only (with correct answers)
-router.get('/:id/admin', requireSuperAdmin, async (req, res) => {
+router.get('/:id/admin', requireCourseAccess(async req => {
+  const { rows } = await pool.query('SELECT course_id FROM quizzes WHERE id=$1', [req.params.id]);
+  return rows[0] && rows[0].course_id;
+}), async (req, res) => {
   const { rows: quizRows } = await pool.query('SELECT * FROM quizzes WHERE id=$1', [req.params.id]);
   if (!quizRows[0]) return res.status(404).json({ error: 'Quiz not found' });
   const { rows: questions } = await pool.query('SELECT * FROM quiz_questions WHERE quiz_id=$1 ORDER BY id ASC', [req.params.id]);
@@ -39,7 +43,7 @@ router.get('/:id/admin', requireSuperAdmin, async (req, res) => {
 });
 
 // POST /api/quizzes - full admin only
-router.post('/', requireSuperAdmin, async (req, res) => {
+router.post('/', requireCourseAccess(req => req.body.course_id), async (req, res) => {
   const { course_id, title } = req.body;
   if (!course_id || !title) return res.status(400).json({ error: 'course_id and title required' });
   const { rows } = await pool.query('INSERT INTO quizzes (course_id, title) VALUES ($1,$2) RETURNING *', [course_id, title]);
@@ -47,7 +51,10 @@ router.post('/', requireSuperAdmin, async (req, res) => {
 });
 
 // PUT /api/quizzes/:id - full admin only. Edit the quiz title.
-router.put('/:id', requireSuperAdmin, async (req, res) => {
+router.put('/:id', requireCourseAccess(async req => {
+  const { rows } = await pool.query('SELECT course_id FROM quizzes WHERE id=$1', [req.params.id]);
+  return rows[0] && rows[0].course_id;
+}), async (req, res) => {
   const { title } = req.body;
   if (!title) return res.status(400).json({ error: 'title required' });
   const { rows } = await pool.query('UPDATE quizzes SET title=$1 WHERE id=$2 RETURNING *', [title, req.params.id]);
@@ -56,13 +63,19 @@ router.put('/:id', requireSuperAdmin, async (req, res) => {
 });
 
 // DELETE /api/quizzes/:id - full admin only
-router.delete('/:id', requireSuperAdmin, async (req, res) => {
+router.delete('/:id', requireCourseAccess(async req => {
+  const { rows } = await pool.query('SELECT course_id FROM quizzes WHERE id=$1', [req.params.id]);
+  return rows[0] && rows[0].course_id;
+}), async (req, res) => {
   await pool.query('DELETE FROM quizzes WHERE id=$1', [req.params.id]);
   res.status(204).end();
 });
 
 // POST /api/quizzes/:id/questions - full admin only
-router.post('/:id/questions', requireSuperAdmin, async (req, res) => {
+router.post('/:id/questions', requireCourseAccess(async req => {
+  const { rows } = await pool.query('SELECT course_id FROM quizzes WHERE id=$1', [req.params.id]);
+  return rows[0] && rows[0].course_id;
+}), async (req, res) => {
   const { question, option_a, option_b, option_c, option_d, correct_option } = req.body;
   if (!question || !correct_option) return res.status(400).json({ error: 'question and correct_option required' });
   const { rows } = await pool.query(
@@ -74,7 +87,13 @@ router.post('/:id/questions', requireSuperAdmin, async (req, res) => {
 });
 
 // PUT /api/quizzes/questions/:qId - full admin only. Edit a question.
-router.put('/questions/:qId', requireSuperAdmin, async (req, res) => {
+router.put('/questions/:qId', requireCourseAccess(async req => {
+  const { rows } = await pool.query(
+    `SELECT qz.course_id FROM quiz_questions qq JOIN quizzes qz ON qz.id = qq.quiz_id WHERE qq.id=$1`,
+    [req.params.qId]
+  );
+  return rows[0] && rows[0].course_id;
+}), async (req, res) => {
   const { question, option_a, option_b, option_c, option_d, correct_option } = req.body;
   if (!question || !correct_option) return res.status(400).json({ error: 'question and correct_option required' });
   const { rows } = await pool.query(
@@ -87,7 +106,13 @@ router.put('/questions/:qId', requireSuperAdmin, async (req, res) => {
 });
 
 // DELETE /api/quizzes/questions/:qId - full admin only
-router.delete('/questions/:qId', requireSuperAdmin, async (req, res) => {
+router.delete('/questions/:qId', requireCourseAccess(async req => {
+  const { rows } = await pool.query(
+    `SELECT qz.course_id FROM quiz_questions qq JOIN quizzes qz ON qz.id = qq.quiz_id WHERE qq.id=$1`,
+    [req.params.qId]
+  );
+  return rows[0] && rows[0].course_id;
+}), async (req, res) => {
   await pool.query('DELETE FROM quiz_questions WHERE id=$1', [req.params.qId]);
   res.status(204).end();
 });
